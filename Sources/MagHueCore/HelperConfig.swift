@@ -10,7 +10,7 @@ public enum MagHue {
 }
 
 public enum LEDMode: String, Codable, CaseIterable {
-    /// Green at/above the threshold while on power, orange below it.
+    /// Green at/above the threshold while on power, red below it.
     case auto
     /// LED always off.
     case off
@@ -51,7 +51,7 @@ public struct HelperConfig: Codable, Equatable {
             return .off
         case .auto:
             guard let battery, battery.onACPower else { return .system }
-            return battery.percent >= threshold ? .green : .orange
+            return battery.percent >= threshold ? .green : .red
         }
     }
 }
