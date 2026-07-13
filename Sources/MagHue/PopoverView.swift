@@ -1,0 +1,171 @@
+import MagHueCore
+import SwiftUI
+
+struct PopoverView: View {
+    @ObservedObject var settings: Settings
+    @ObservedObject var helper: HelperManager
+    @ObservedObject var monitor: BatteryMonitor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+
+            if helper.isInstalled {
+                controls
+            } else {
+                installPrompt
+            }
+
+            if let error = helper.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Divider()
+            options
+            Divider()
+            footer
+        }
+        .padding(14)
+        .frame(width: 300)
+    }
+
+    // MARK: - Sections
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            ledDot
+            VStack(alignment: .leading, spacing: 1) {
+                Text("MagHue").font(.headline)
+                Text(batteryLine)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private var installPrompt: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("MagHue needs a small background helper to control the MagSafe LED. Installing it asks for your admin password once.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Install Helper…") {
+                helper.install(initialConfig: settings.helperConfig)
+            }
+            .keyboardShortcut(.defaultAction)
+        }
+    }
+
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("LED", selection: $settings.mode) {
+                Text("Automatic").tag(LEDMode.auto)
+                Text("Off").tag(LEDMode.off)
+                Text("System").tag(LEDMode.system)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if settings.mode == .auto {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Turn green at \(settings.threshold)%")
+                        .font(.callout)
+                    Slider(
+                        value: Binding(
+                            get: { Double(settings.threshold) },
+                            set: { settings.threshold = Int($0.rounded()) }
+                        ),
+                        in: 10...100,
+                        step: 5
+                    )
+                    Text("Below \(settings.threshold)% the LED stays orange while charging.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if settings.mode == .off {
+                Text("The MagSafe LED stays dark.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("macOS controls the LED (green only at 100%).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var options: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            Toggle("Show percentage in menu bar", isOn: $settings.showPercentInMenuBar)
+            Toggle("Notify when threshold is reached", isOn: $settings.notifyOnThreshold)
+                .onChange(of: settings.notifyOnThreshold) { _, enabled in
+                    if enabled { monitor.requestNotificationPermission() }
+                }
+            if let error = settings.launchAtLoginError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+        .toggleStyle(.checkbox)
+        .font(.callout)
+    }
+
+    private var footer: some View {
+        HStack {
+            if helper.isInstalled {
+                Button("Uninstall Helper") { helper.uninstall() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Quit MagHue") { NSApp.terminate(nil) }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// A live preview of what the LED should look like right now.
+    private var ledDot: some View {
+        let color: Color
+        switch settings.helperConfig.desiredColor(for: monitor.state) {
+        case .green: color = .green
+        case .orange: color = .orange
+        case .off: color = Color(nsColor: .darkGray)
+        case .system:
+            color = (monitor.state?.isCharged ?? false) ? .green
+                : (monitor.state?.onACPower ?? false) ? .orange
+                : Color(nsColor: .darkGray)
+        }
+        return Circle()
+            .fill(color)
+            .frame(width: 14, height: 14)
+            .shadow(color: color.opacity(0.6), radius: 3)
+    }
+
+    private var batteryLine: String {
+        guard let state = monitor.state else { return "No battery information" }
+        var line = "\(state.percent)%"
+        if state.isCharged {
+            line += " • charged"
+        } else if state.isCharging {
+            line += " • charging"
+        } else if state.onACPower {
+            line += " • on power"
+        } else {
+            line += " • on battery"
+        }
+        if !helper.isInstalled {
+            line += " • helper not installed"
+        }
+        return line
+    }
+}
