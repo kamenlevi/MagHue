@@ -5,6 +5,7 @@ struct PopoverView: View {
     @ObservedObject var settings: Settings
     @ObservedObject var helper: HelperManager
     @ObservedObject var monitor: BatteryMonitor
+    @State private var systemChargeStatus: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -121,6 +122,7 @@ struct PopoverView: View {
     @ViewBuilder
     private var chargeToFullButton: some View {
         if ChargeLimit.isSupported() {
+            // Older firmware: MagHue lifts the limit itself via the helper.
             VStack(alignment: .leading, spacing: 3) {
                 Button(settings.chargeToFull ? "Cancel Charge to Full" : "Charge to Full Once") {
                     settings.chargeToFull.toggle()
@@ -131,6 +133,31 @@ struct PopoverView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+        } else if SystemChargeToFull.isAvailableOnThisOS {
+            // macOS 26.4+: press Apple's own "Charge to Full Now" for the user.
+            VStack(alignment: .leading, spacing: 3) {
+                Button("Charge to Full Now") { triggerSystemChargeToFull() }
+                Text(systemChargeStatus ?? "Presses macOS's own “Charge to Full Now” so the battery fills to 100% this once, then your limit returns on its own.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func triggerSystemChargeToFull() {
+        systemChargeStatus = "Asking macOS…"
+        SystemChargeToFull.trigger { outcome in
+            switch outcome {
+            case .success:
+                systemChargeStatus = "Told macOS to charge to 100%. It returns to your limit automatically."
+            case .needsAccessibilityPermission:
+                systemChargeStatus = "Turn on MagHue in System Settings → Privacy & Security → Accessibility, then try again."
+            case .controlCenterUnavailable:
+                systemChargeStatus = "Couldn't reach the system battery menu. Try again in a moment."
+            case .buttonNotFound:
+                systemChargeStatus = "No “Charge to Full Now” right now — this appears only while your Mac is holding at a charge limit on power."
             }
         }
     }
