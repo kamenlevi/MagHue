@@ -75,26 +75,23 @@ struct PopoverView: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("MAGSAFE LIGHT")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+            Picker("LED", selection: $settings.mode) {
+                Text("Automatic").tag(LEDMode.auto)
+                Text("Off").tag(LEDMode.off)
+                Text("System").tag(LEDMode.system)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
-            modeRow(.auto,
-                    title: "Turn green early",
-                    subtitle: "Show green once the battery reaches the level you pick below. Amber while it's still lower.")
-            modeRow(.off,
-                    title: "Keep the light off",
-                    subtitle: "The MagSafe light stays completely dark while plugged in.")
-            modeRow(.system,
-                    title: "Leave it to macOS",
-                    subtitle: "Normal Mac behaviour — amber while charging, green only at a full 100%.")
+            Text(modeExplanation)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if settings.mode == .auto {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Turn green at \(settings.threshold)%")
                         .font(.callout)
-                        .fontWeight(.medium)
                     Slider(
                         value: Binding(
                             get: { Double(settings.threshold) },
@@ -104,42 +101,21 @@ struct PopoverView: View {
                         step: 5
                     )
                 }
-                .padding(.top, 2)
                 chargeToFullButton
             }
         }
     }
 
-    /// One selectable LED-mode option with a plain-language explanation.
-    private func modeRow(_ mode: LEDMode, title: String, subtitle: String) -> some View {
-        let selected = settings.mode == mode
-        return Button {
-            settings.mode = mode
-        } label: {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                    .font(.body)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.callout)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(6)
-            .background(
-                RoundedRectangle(cornerRadius: 7)
-                    .fill(selected ? Color.accentColor.opacity(0.12) : Color.clear)
-            )
-            .contentShape(Rectangle())
+    /// Plain-language description of whichever LED mode is selected.
+    private var modeExplanation: String {
+        switch settings.mode {
+        case .auto:
+            return "Shows green once the battery reaches the level you set below, and amber while it's still lower."
+        case .off:
+            return "Keeps the MagSafe light completely dark while the laptop is plugged in."
+        case .system:
+            return "Standard Mac behaviour — amber while charging, green only at a full 100%."
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
