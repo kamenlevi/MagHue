@@ -2,16 +2,16 @@
 
 Choose when your MagSafe charger's LED turns green.
 
-Out of the box, macOS keeps the MagSafe LED red until the battery hits 100%.
+Out of the box, macOS keeps the MagSafe LED amber until the battery hits 100%.
 MagHue is a tiny menu bar app that lets you pick the percentage instead — set it
 to 80% and the LED turns green the moment your battery reaches 80% while
-charging, and back to red if it ever drops below. Perfect if you use a
+charging, and back to amber if it ever drops below. Perfect if you use a
 charge limit and your Mac never *reaches* 100%.
 
 ## Features
 
 - **Threshold slider** — pick the battery percentage (10–100%) at which the LED
-  turns green while on power; below it the LED shows the usual red.
+  turns green while on power; below it the LED shows the usual amber.
 - **Three LED modes** — Automatic (threshold), always **Off** (sleep-friendly),
   or **System** (stock macOS behavior).
 - Optional extras, all off by default: launch at login, battery percentage in
@@ -40,8 +40,7 @@ asked for your admin password once. That's it.
 ## How it works
 
 Apple Silicon Macs expose an SMC key called `ACLC` that selects the MagSafe LED
-color (`0` system, `1` off, `3` green, `4` red — the standard reddish-amber
-"charging" color). Writing SMC keys requires
+color (`0` system, `1` off, `3` green, `4` amber). Writing SMC keys requires
 root, so MagHue installs a small launchd daemon
 (`com.kamenlevi.maghue.helper`) that watches the battery and the config file
 and writes that one key. The menu bar app is just the UI; the daemon does the

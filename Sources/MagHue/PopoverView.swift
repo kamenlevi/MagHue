@@ -81,7 +81,7 @@ struct PopoverView: View {
                         in: 10...100,
                         step: 5
                     )
-                    Text("Below \(settings.threshold)% the LED stays red while charging.")
+                    Text("Below \(settings.threshold)% the LED stays amber while charging.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -135,16 +135,16 @@ struct PopoverView: View {
 
     /// A live preview of what the LED should look like right now.
     private var ledDot: some View {
-        // The LED's "charging" color in person: a reddish amber.
-        let ledRed = Color(red: 1.0, green: 0.27, blue: 0.12)
+        // The LED's "charging" color: amber, as Apple calls it.
+        let ledAmber = Color(red: 1.0, green: 0.55, blue: 0.1)
         let color: Color
         switch settings.helperConfig.desiredColor(for: monitor.state) {
         case .green: color = .green
-        case .red: color = ledRed
+        case .amber: color = ledAmber
         case .off: color = Color(nsColor: .darkGray)
         case .system:
             color = (monitor.state?.isCharged ?? false) ? .green
-                : (monitor.state?.onACPower ?? false) ? ledRed
+                : (monitor.state?.onACPower ?? false) ? ledAmber
                 : Color(nsColor: .darkGray)
         }
         return Circle()

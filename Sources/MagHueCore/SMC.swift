@@ -145,8 +145,8 @@ public enum MagSafeLED {
         case system = 0
         case off = 1
         case green = 3
-        /// The standard "still charging" color; a reddish amber in person.
-        case red = 4
+        /// The standard "still charging" color — amber, as Apple calls it.
+        case amber = 4
     }
 
     public static func set(_ color: Color) throws {
