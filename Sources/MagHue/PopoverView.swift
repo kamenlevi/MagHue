@@ -12,6 +12,9 @@ struct PopoverView: View {
 
             if helper.isInstalled {
                 controls
+                if helper.needsUpdate {
+                    updatePrompt
+                }
             } else {
                 installPrompt
             }
@@ -59,6 +62,17 @@ struct PopoverView: View {
         }
     }
 
+    private var updatePrompt: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("The background helper is older than the app.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Update Helper…") {
+                helper.install(initialConfig: settings.helperConfig)
+            }
+        }
+    }
+
     private var controls: some View {
         VStack(alignment: .leading, spacing: 10) {
             Picker("LED", selection: $settings.mode) {
@@ -85,6 +99,7 @@ struct PopoverView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                chargeToFullButton
             } else if settings.mode == .off {
                 Text("The MagSafe LED stays dark.")
                     .font(.caption)
@@ -97,10 +112,40 @@ struct PopoverView: View {
         }
     }
 
+    @ViewBuilder
+    private var chargeToFullButton: some View {
+        if ChargeLimit.isSupported() {
+            VStack(alignment: .leading, spacing: 3) {
+                Button(settings.chargeToFull ? "Cancel Charge to Full" : "Charge to Full Once") {
+                    settings.chargeToFull.toggle()
+                }
+                if settings.chargeToFull {
+                    Text("The macOS charge limit is lifted until the battery hits 100%, then it comes back on its own. The LED still turns green at \(settings.threshold)%.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
     private var options: some View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("Launch at login", isOn: $settings.launchAtLogin)
             Toggle("Show percentage in menu bar", isOn: $settings.showPercentInMenuBar)
+            Toggle("Battery icon in menu bar", isOn: $settings.useBatteryIcon)
+            if settings.useBatteryIcon {
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("iPhone-style colors", isOn: $settings.iphoneStyleColors)
+                    if settings.iphoneStyleColors {
+                        Text("Green charging, yellow in Low Power Mode, red at 20% or below.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.leading, 18)
+            }
             Toggle("Notify when threshold is reached", isOn: $settings.notifyOnThreshold)
                 .onChange(of: settings.notifyOnThreshold) { _, enabled in
                     if enabled { monitor.requestNotificationPermission() }

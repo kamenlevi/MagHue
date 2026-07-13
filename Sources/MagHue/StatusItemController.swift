@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import MagHueCore
 import SwiftUI
 
 /// Owns the menu bar item and the popover that hosts the SwiftUI interface.
@@ -21,8 +22,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(togglePopover)
-            button.image = Self.menuBarIcon()
-            button.imagePosition = .imageLeading
         }
 
         popover.behavior = .transient
@@ -32,16 +31,20 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             rootView: PopoverView(settings: settings, helper: helper, monitor: monitor)
         )
 
-        settings.$showPercentInMenuBar
-            .combineLatest(monitor.$state)
+        Publishers.CombineLatest4(settings.$showPercentInMenuBar,
+                                  settings.$useBatteryIcon,
+                                  settings.$iphoneStyleColors,
+                                  monitor.$state)
+            .combineLatest(monitor.$lowPowerMode)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] showPercent, state in
-                self?.updateTitle(showPercent: showPercent, percent: state?.percent)
+            .sink { [weak self] _, _ in
+                self?.updateButton()
             }
             .store(in: &cancellables)
+        updateButton()
     }
 
-    private static func menuBarIcon() -> NSImage? {
+    private static func magSafeIcon() -> NSImage? {
         for symbol in ["magsafe.batterypack", "bolt.badge.checkmark", "bolt.circle"] {
             if let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "MagHue") {
                 image.isTemplate = true
@@ -51,11 +54,44 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         return nil
     }
 
-    private func updateTitle(showPercent: Bool, percent: Int?) {
-        if showPercent, let percent {
-            statusItem.button?.title = " \(percent)%"
+    private func batteryIcon(for state: BatteryState?) -> NSImage? {
+        if settings.iphoneStyleColors,
+           let color = BatteryIcon.iphoneColor(for: state, lowPowerMode: monitor.lowPowerMode) {
+            return BatteryIcon.render(percent: state?.percent ?? 0,
+                                      fill: color,
+                                      bolt: state?.onACPower ?? false)
+        }
+        // Neutral state: the template SF battery adapts to the menu bar.
+        let percent = state?.percent ?? 0
+        let level = [0, 25, 50, 75, 100].min { abs($0 - percent) < abs($1 - percent) } ?? 100
+        let image = NSImage(systemSymbolName: "battery.\(level)percent",
+                            accessibilityDescription: "Battery \(percent)%")
+        image?.isTemplate = true
+        return image
+    }
+
+    private func updateButton() {
+        guard let button = statusItem.button else { return }
+        let state = monitor.state
+
+        if settings.useBatteryIcon {
+            button.image = batteryIcon(for: state)
+            if settings.showPercentInMenuBar, let percent = state?.percent {
+                // Percentage to the left of the icon, like the system item.
+                button.title = "\(percent)% "
+                button.imagePosition = .imageTrailing
+            } else {
+                button.title = ""
+                button.imagePosition = .imageLeading
+            }
         } else {
-            statusItem.button?.title = ""
+            button.image = Self.magSafeIcon()
+            button.imagePosition = .imageLeading
+            if settings.showPercentInMenuBar, let percent = state?.percent {
+                button.title = " \(percent)%"
+            } else {
+                button.title = ""
+            }
         }
     }
 
@@ -66,6 +102,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         } else {
             helper.refresh()
             monitor.refresh()
+            settings.syncFromDisk()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate(ignoringOtherApps: true)

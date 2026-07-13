@@ -8,6 +8,7 @@ import UserNotifications
 /// threshold notification. LED changes are the helper's job, not ours.
 final class BatteryMonitor: ObservableObject {
     @Published private(set) var state: BatteryState?
+    @Published private(set) var lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     private let settings: Settings
     private var timer: Timer?
@@ -18,6 +19,12 @@ final class BatteryMonitor: ObservableObject {
         self.settings = settings
         state = Battery.read()
         wasAboveThreshold = aboveThreshold(state)
+
+        NotificationCenter.default.addObserver(
+            forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+        }
 
         let callback: IOPowerSourceCallbackType = { context in
             let monitor = Unmanaged<BatteryMonitor>.fromOpaque(context!).takeUnretainedValue()
@@ -42,6 +49,11 @@ final class BatteryMonitor: ObservableObject {
         wasAboveThreshold = above
         if fresh != state {
             state = fresh
+        }
+        // The helper clears the Charge to Full flag in the config file when
+        // the battery fills up; mirror that into the UI.
+        if settings.chargeToFull {
+            settings.syncFromDisk()
         }
     }
 

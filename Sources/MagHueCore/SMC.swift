@@ -66,7 +66,9 @@ public enum SMC {
     }
 
     private static let kSMCHandleYPCEvent: UInt32 = 2
+    private static let kSMCReadKey: UInt8 = 5
     private static let kSMCWriteKey: UInt8 = 6
+    private static let kSMCGetKeyFromIndex: UInt8 = 8
     private static let kSMCGetKeyInfo: UInt8 = 9
 
     public static func fourCC(_ code: String) -> UInt32 {
@@ -119,6 +121,58 @@ public enum SMC {
         }
     }
 
+    /// Lists every key the SMC exposes. Works unprivileged; diagnostic use.
+    public static func allKeys() throws -> [String] {
+        try withConnection { connection in
+            var countRequest = SMCParamStruct()
+            countRequest.key = fourCC("#KEY")
+            countRequest.data8 = kSMCReadKey
+            countRequest.keyInfo.dataSize = 4
+            let countReply = try call(connection, countRequest)
+            let count = UInt32(countReply.bytes.0) << 24 | UInt32(countReply.bytes.1) << 16
+                      | UInt32(countReply.bytes.2) << 8 | UInt32(countReply.bytes.3)
+
+            var keys: [String] = []
+            for index in 0..<count {
+                var request = SMCParamStruct()
+                request.data8 = kSMCGetKeyFromIndex
+                request.data32 = index
+                guard let reply = try? call(connection, request) else { continue }
+                let k = reply.key
+                if let name = String(bytes: [UInt8(k >> 24 & 0xff), UInt8(k >> 16 & 0xff),
+                                             UInt8(k >> 8 & 0xff), UInt8(k & 0xff)],
+                                     encoding: .ascii) {
+                    keys.append(name)
+                }
+            }
+            return keys
+        }
+    }
+
+    /// Reads a key's raw bytes. Works unprivileged.
+    public static func readBytes(_ key: String) throws -> [UInt8] {
+        try withConnection { connection in
+            var info = SMCParamStruct()
+            info.key = fourCC(key)
+            info.data8 = kSMCGetKeyInfo
+            let infoReply = try call(connection, info)
+
+            var request = SMCParamStruct()
+            request.key = fourCC(key)
+            request.data8 = kSMCReadKey
+            request.keyInfo.dataSize = infoReply.keyInfo.dataSize
+            let reply = try call(connection, request)
+            return withUnsafeBytes(of: reply.bytes) {
+                Array($0.prefix(Int(infoReply.keyInfo.dataSize)))
+            }
+        }
+    }
+
+    /// Reads a single-byte SMC key. Works unprivileged.
+    public static func readByte(_ key: String) throws -> UInt8 {
+        try readBytes(key).first ?? 0
+    }
+
     /// Writes a single-byte SMC key. Requires root.
     public static func writeByte(_ key: String, _ value: UInt8) throws {
         try withConnection { connection in
@@ -156,5 +210,68 @@ public enum MagSafeLED {
     /// True if this Mac exposes the MagSafe LED key at all.
     public static func isSupported() -> Bool {
         (try? SMC.keyInfo(key)) != nil
+    }
+}
+
+/// The firmware-managed charge limit on modern Apple Silicon (macOS 26-era).
+/// macOS's own "Charge Limit / Optimized Battery Charging" is enforced through
+/// this key set; the firmware keeps the battery within [lower, upper] itself.
+///
+/// - `bfF0` activation: 0x00 = off (charge to 100%), 0x02 = limit active.
+/// - `bfD0` upper / `bfE0` lower: percentages, low byte first.
+///
+/// These are the same keys and write semantics that `batt` and AlDente use.
+/// The one-shot "Charge to Full" sets activation to 0x00 and later restores
+/// the saved limit. If the full key set isn't present (as on some firmware
+/// revisions), `isSupported()` is false and MagHue writes nothing.
+public enum ChargeLimit {
+    static let activationKey = "bfF0"
+    static let upperKey = "bfD0"
+    static let lowerKey = "bfE0"
+
+    public struct State: Equatable {
+        public var active: Bool
+        public var lower: Int
+        public var upper: Int
+        public init(active: Bool, lower: Int, upper: Int) {
+            self.active = active
+            self.lower = lower
+            self.upper = upper
+        }
+    }
+
+    /// True only when every key needed to lift *and* restore the limit is
+    /// present. Unprivileged, so the app can gate the UI with it.
+    public static func isSupported() -> Bool {
+        (try? SMC.keyInfo(activationKey)) != nil
+            && (try? SMC.keyInfo(upperKey)) != nil
+            && (try? SMC.keyInfo(lowerKey)) != nil
+    }
+
+    public static func read() throws -> State {
+        State(active: try SMC.readByte(activationKey) == 0x02,
+              lower: try readPercent(lowerKey),
+              upper: try readPercent(upperKey))
+    }
+
+    private static func readPercent(_ key: String) throws -> Int {
+        // Percentages are stored low byte first.
+        Int(try SMC.readBytes(key).first ?? 0)
+    }
+
+    /// Lift the limit so the battery charges to 100%. Requires root.
+    public static func disable() throws {
+        try SMC.writeByte(activationKey, 0x00)
+    }
+
+    /// Restore an active limit with the given bounds. Write order matters and
+    /// mirrors the firmware's expected sequence. Requires root.
+    public static func enable(lower: Int, upper: Int) throws {
+        try SMC.writeByte(activationKey, 0x00)
+        // writeByte pads the remaining bytes with zero, giving the correct
+        // low-byte-first percentage for these multi-byte keys.
+        try SMC.writeByte(upperKey, UInt8(min(max(upper, 0), 100)))
+        try SMC.writeByte(lowerKey, UInt8(min(max(lower, 0), 100)))
+        try SMC.writeByte(activationKey, 0x02)
     }
 }

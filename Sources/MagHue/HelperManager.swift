@@ -5,6 +5,7 @@ import MagHueCore
 /// Installs, removes, and feeds config to the privileged helper daemon.
 final class HelperManager: ObservableObject {
     @Published private(set) var isInstalled: Bool = false
+    @Published private(set) var needsUpdate: Bool = false
     @Published var lastError: String?
 
     init() {
@@ -15,6 +16,17 @@ final class HelperManager: ObservableObject {
         let fm = FileManager.default
         isInstalled = fm.fileExists(atPath: MagHue.helperPlistPath)
             && fm.fileExists(atPath: MagHue.helperBinaryPath)
+        needsUpdate = isInstalled && !installedHelperMatchesBundled()
+    }
+
+    /// The installed helper is root-owned but world-readable, so we can
+    /// compare it byte-for-byte against the copy shipped inside the app.
+    private func installedHelperMatchesBundled() -> Bool {
+        guard let bundled = Bundle.main.path(forResource: "maghue-helper", ofType: nil),
+              let bundledData = FileManager.default.contents(atPath: bundled),
+              let installedData = FileManager.default.contents(atPath: MagHue.helperBinaryPath)
+        else { return true }
+        return bundledData == installedData
     }
 
     /// Writes the config file the helper watches. The installer chowns the

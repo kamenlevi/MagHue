@@ -14,6 +14,14 @@ charge limit and your Mac never *reaches* 100%.
   turns green while on power; below it the LED shows the usual amber.
 - **Three LED modes** — Automatic (threshold), always **Off** (sleep-friendly),
   or **System** (stock macOS behavior).
+- **Charge to Full once** — a one-shot button that lifts the macOS charge limit
+  so the battery fills to 100% this time (handy before travel), then restores
+  your limit automatically once it's full. Shown only on Macs whose firmware
+  exposes the charge-limit keys.
+- **Battery icon replacement** — optionally swap the menu bar glyph for an
+  iPhone-style battery, with iPhone-style colors: green while charging, yellow
+  in Low Power Mode, red at 20% or below. Percentage sits to the left of the
+  icon, just like Apple's.
 - Optional extras, all off by default: launch at login, battery percentage in
   the menu bar, and a notification when the threshold is reached.
 - Works even when the app is closed — a tiny background helper keeps the LED
@@ -45,6 +53,13 @@ root, so MagHue installs a small launchd daemon
 (`com.kamenlevi.maghue.helper`) that watches the battery and the config file
 and writes that one key. The menu bar app is just the UI; the daemon does the
 work, which is why the LED stays correct even when the app isn't running.
+
+**Charge to Full** works through the firmware charge-limit keys (`bfF0`/`bfD0`/
+`bfE0`) — the same mechanism macOS's own Charge Limit uses. MagHue lifts the
+limit, waits for 100%, then restores your exact previous setting. If your Mac's
+firmware doesn't expose the full key set, the button simply doesn't appear and
+MagHue never touches charging at all. The menu bar battery icon and its
+iPhone-style colors are drawn entirely in the app and touch no SMC keys.
 
 ### Is this safe?
 
