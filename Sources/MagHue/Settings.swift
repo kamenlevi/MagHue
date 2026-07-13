@@ -21,12 +21,6 @@ final class Settings: ObservableObject {
     @Published var showPercentInMenuBar: Bool {
         didSet { defaults.set(showPercentInMenuBar, forKey: "showPercentInMenuBar") }
     }
-    @Published var useBatteryIcon: Bool {
-        didSet { defaults.set(useBatteryIcon, forKey: "useBatteryIcon") }
-    }
-    @Published var iphoneStyleColors: Bool {
-        didSet { defaults.set(iphoneStyleColors, forKey: "iphoneStyleColors") }
-    }
     @Published var notifyOnThreshold: Bool {
         didSet { defaults.set(notifyOnThreshold, forKey: "notifyOnThreshold") }
     }
@@ -45,9 +39,14 @@ final class Settings: ObservableObject {
         threshold = stored == 0 ? 80 : stored
         chargeToFull = HelperConfig.load().chargeToFull
         showPercentInMenuBar = defaults.bool(forKey: "showPercentInMenuBar")
-        useBatteryIcon = defaults.bool(forKey: "useBatteryIcon")
-        iphoneStyleColors = defaults.bool(forKey: "iphoneStyleColors")
         notifyOnThreshold = defaults.bool(forKey: "notifyOnThreshold")
+
+        // Launch at login defaults to on: register it the first time the app
+        // runs, then respect whatever the user chooses afterwards.
+        if !defaults.bool(forKey: "didSetInitialLaunchAtLogin") {
+            defaults.set(true, forKey: "didSetInitialLaunchAtLogin")
+            try? SMAppService.mainApp.register()
+        }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

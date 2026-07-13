@@ -31,11 +31,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             rootView: PopoverView(settings: settings, helper: helper, monitor: monitor)
         )
 
-        Publishers.CombineLatest4(settings.$showPercentInMenuBar,
-                                  settings.$useBatteryIcon,
-                                  settings.$iphoneStyleColors,
-                                  monitor.$state)
-            .combineLatest(monitor.$lowPowerMode)
+        settings.$showPercentInMenuBar
+            .combineLatest(monitor.$state)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _, _ in
                 self?.updateButton()
@@ -54,44 +51,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         return nil
     }
 
-    private func batteryIcon(for state: BatteryState?) -> NSImage? {
-        if settings.iphoneStyleColors,
-           let color = BatteryIcon.iphoneColor(for: state, lowPowerMode: monitor.lowPowerMode) {
-            return BatteryIcon.render(percent: state?.percent ?? 0,
-                                      fill: color,
-                                      bolt: state?.onACPower ?? false)
-        }
-        // Neutral state: the template SF battery adapts to the menu bar.
-        let percent = state?.percent ?? 0
-        let level = [0, 25, 50, 75, 100].min { abs($0 - percent) < abs($1 - percent) } ?? 100
-        let image = NSImage(systemSymbolName: "battery.\(level)percent",
-                            accessibilityDescription: "Battery \(percent)%")
-        image?.isTemplate = true
-        return image
-    }
-
     private func updateButton() {
         guard let button = statusItem.button else { return }
-        let state = monitor.state
-
-        if settings.useBatteryIcon {
-            button.image = batteryIcon(for: state)
-            if settings.showPercentInMenuBar, let percent = state?.percent {
-                // Percentage to the left of the icon, like the system item.
-                button.title = "\(percent)% "
-                button.imagePosition = .imageTrailing
-            } else {
-                button.title = ""
-                button.imagePosition = .imageLeading
-            }
+        button.image = Self.magSafeIcon()
+        button.imagePosition = .imageLeading
+        if settings.showPercentInMenuBar, let percent = monitor.state?.percent {
+            button.title = " \(percent)%"
         } else {
-            button.image = Self.magSafeIcon()
-            button.imagePosition = .imageLeading
-            if settings.showPercentInMenuBar, let percent = state?.percent {
-                button.title = " \(percent)%"
-            } else {
-                button.title = ""
-            }
+            button.title = ""
         }
     }
 

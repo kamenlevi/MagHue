@@ -12,18 +12,16 @@ charge limit and your Mac never *reaches* 100%.
 
 - **Threshold slider** — pick the battery percentage (10–100%) at which the LED
   turns green while on power; below it the LED shows the usual amber.
-- **Three LED modes** — Automatic (threshold), always **Off** (sleep-friendly),
-  or **System** (stock macOS behavior).
+- **Three plain-language LED modes** — *Turn green early* (green at your chosen
+  level), *Keep the light off* (dark while plugged in), or *Leave it to macOS*
+  (stock behavior). Each is labelled with a one-line explanation in the app.
 - **Charge to Full once** — a one-shot button that lifts the macOS charge limit
   so the battery fills to 100% this time (handy before travel), then restores
   your limit automatically once it's full. Shown only on Macs whose firmware
   exposes the charge-limit keys.
-- **Battery icon replacement** — optionally swap the menu bar glyph for an
-  iPhone-style battery, with iPhone-style colors: green while charging, yellow
-  in Low Power Mode, red at 20% or below. Percentage sits to the left of the
-  icon, just like Apple's.
-- Optional extras, all off by default: launch at login, battery percentage in
-  the menu bar, and a notification when the threshold is reached.
+- Optional extras: battery percentage in the menu bar and a notification when
+  the threshold is reached (both off by default). Launch at login is on by
+  default and can be turned off.
 - Works even when the app is closed — a tiny background helper keeps the LED
   correct at all times.
 
@@ -58,8 +56,7 @@ work, which is why the LED stays correct even when the app isn't running.
 `bfE0`) — the same mechanism macOS's own Charge Limit uses. MagHue lifts the
 limit, waits for 100%, then restores your exact previous setting. If your Mac's
 firmware doesn't expose the full key set, the button simply doesn't appear and
-MagHue never touches charging at all. The menu bar battery icon and its
-iPhone-style colors are drawn entirely in the app and touch no SMC keys.
+MagHue never touches charging at all.
 
 ### Is this safe?
 

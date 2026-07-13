@@ -74,19 +74,27 @@ struct PopoverView: View {
     }
 
     private var controls: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("LED", selection: $settings.mode) {
-                Text("Automatic").tag(LEDMode.auto)
-                Text("Off").tag(LEDMode.off)
-                Text("System").tag(LEDMode.system)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+        VStack(alignment: .leading, spacing: 8) {
+            Text("MAGSAFE LIGHT")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            modeRow(.auto,
+                    title: "Turn green early",
+                    subtitle: "Show green once the battery reaches the level you pick below. Amber while it's still lower.")
+            modeRow(.off,
+                    title: "Keep the light off",
+                    subtitle: "The MagSafe light stays completely dark while plugged in.")
+            modeRow(.system,
+                    title: "Leave it to macOS",
+                    subtitle: "Normal Mac behaviour — amber while charging, green only at a full 100%.")
 
             if settings.mode == .auto {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Turn green at \(settings.threshold)%")
                         .font(.callout)
+                        .fontWeight(.medium)
                     Slider(
                         value: Binding(
                             get: { Double(settings.threshold) },
@@ -95,21 +103,43 @@ struct PopoverView: View {
                         in: 10...100,
                         step: 5
                     )
-                    Text("Below \(settings.threshold)% the LED stays amber while charging.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
+                .padding(.top, 2)
                 chargeToFullButton
-            } else if settings.mode == .off {
-                Text("The MagSafe LED stays dark.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("macOS controls the LED (green only at 100%).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// One selectable LED-mode option with a plain-language explanation.
+    private func modeRow(_ mode: LEDMode, title: String, subtitle: String) -> some View {
+        let selected = settings.mode == mode
+        return Button {
+            settings.mode = mode
+        } label: {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    .font(.body)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(6)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(selected ? Color.accentColor.opacity(0.12) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -133,19 +163,6 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("Launch at login", isOn: $settings.launchAtLogin)
             Toggle("Show percentage in menu bar", isOn: $settings.showPercentInMenuBar)
-            Toggle("Battery icon in menu bar", isOn: $settings.useBatteryIcon)
-            if settings.useBatteryIcon {
-                VStack(alignment: .leading, spacing: 2) {
-                    Toggle("iPhone-style colors", isOn: $settings.iphoneStyleColors)
-                    if settings.iphoneStyleColors {
-                        Text("Green charging, yellow in Low Power Mode, red at 20% or below.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(.leading, 18)
-            }
             Toggle("Notify when threshold is reached", isOn: $settings.notifyOnThreshold)
                 .onChange(of: settings.notifyOnThreshold) { _, enabled in
                     if enabled { monitor.requestNotificationPermission() }
