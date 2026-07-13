@@ -16,7 +16,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         self.settings = settings
         self.helper = helper
         self.monitor = monitor
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
         if let button = statusItem.button {
@@ -73,6 +73,30 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate(ignoringOtherApps: true)
+            fixPopoverPosition(under: button)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let button = self.statusItem.button else { return }
+                self.fixPopoverPosition(under: button)
+            }
         }
+    }
+
+    /// macOS 26 sometimes places status item popovers too high, overlapping
+    /// the menu bar with the arrow pushed off-screen. If that happened, move
+    /// the popover window so its top (and arrow) sits right below the icon.
+    private func fixPopoverPosition(under button: NSStatusBarButton) {
+        guard let popWindow = popover.contentViewController?.view.window,
+              let iconWindow = button.window else { return }
+        let icon = iconWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        var frame = popWindow.frame
+        guard frame.maxY > icon.minY else { return } // already placed correctly
+
+        frame.origin.y = icon.minY - frame.height
+        frame.origin.x = icon.midX - frame.width / 2
+        if let screen = iconWindow.screen ?? NSScreen.main {
+            frame.origin.x = min(max(frame.origin.x, screen.visibleFrame.minX + 4),
+                                 screen.visibleFrame.maxX - frame.width - 4)
+        }
+        popWindow.setFrame(frame, display: true)
     }
 }
