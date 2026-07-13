@@ -8,7 +8,7 @@ struct PopoverView: View {
     @State private var systemChargeStatus: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 9) {
             header
 
             if helper.isInstalled {
@@ -31,7 +31,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .padding(14)
+        .padding(12)
         .frame(width: 300)
     }
 
@@ -75,7 +75,7 @@ struct PopoverView: View {
     }
 
     private var controls: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Picker("LED", selection: $settings.mode) {
                 Text("Automatic").tag(LEDMode.auto)
                 Text("Off").tag(LEDMode.off)
@@ -138,7 +138,7 @@ struct PopoverView: View {
             // macOS 26.4+: press Apple's own "Charge to Full Now" for the user.
             VStack(alignment: .leading, spacing: 3) {
                 Button("Charge to Full Now") { triggerSystemChargeToFull() }
-                Text(systemChargeStatus ?? "Presses macOS's own “Charge to Full Now” so the battery fills to 100% this once, then your limit returns on its own.")
+                Text(systemChargeStatus ?? "Fills to 100% this once, then your limit returns on its own.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
