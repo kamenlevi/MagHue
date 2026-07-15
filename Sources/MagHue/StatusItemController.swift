@@ -10,12 +10,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let settings: Settings
     private let helper: HelperManager
     private let monitor: BatteryMonitor
+    private let location: LocationProvider
     private var cancellables: Set<AnyCancellable> = []
 
-    init(settings: Settings, helper: HelperManager, monitor: BatteryMonitor) {
+    init(settings: Settings, helper: HelperManager, monitor: BatteryMonitor,
+         location: LocationProvider) {
         self.settings = settings
         self.helper = helper
         self.monitor = monitor
+        self.location = location
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
@@ -28,7 +31,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.animates = false
         popover.delegate = self
         popover.contentViewController = NSHostingController(
-            rootView: PopoverView(settings: settings, helper: helper, monitor: monitor)
+            rootView: PopoverView(settings: settings, helper: helper,
+                                  monitor: monitor, location: location)
         )
 
         settings.$showPercentInMenuBar

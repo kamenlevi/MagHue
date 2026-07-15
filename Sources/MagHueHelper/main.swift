@@ -38,6 +38,20 @@ if let index = CommandLine.arguments.firstIndex(of: "--read"),
     exit(0)
 }
 
+if let index = CommandLine.arguments.firstIndex(of: "--solar"),
+   CommandLine.arguments.count > index + 2,
+   let lat = Double(CommandLine.arguments[index + 1]),
+   let lon = Double(CommandLine.arguments[index + 2]) {
+    if let events = SolarTimes.events(latitude: lat, longitude: lon,
+                                      on: Date(), calendar: .current) {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = .current
+        print("lat=\(lat) lon=\(lon)  sunrise=\(f.string(from: events.sunrise))  sunset=\(f.string(from: events.sunset))")
+    } else {
+        print("no solar events (polar day/night)")
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--keys") {
     do {
         for key in try SMC.allKeys().sorted() {
@@ -63,10 +77,18 @@ if CommandLine.arguments.contains("--probe") {
     } else {
         print("charge limit: keys unavailable — Charge to Full is disabled on this Mac")
     }
+    let probeConfig = HelperConfig.load()
+    print("schedules: \(probeConfig.schedules.count), location: " +
+          (probeConfig.latitude != nil ? "set" : "none"))
+    if let active = probeConfig.activeSchedule(at: Date()) {
+        print("active schedule now: \(active.action.displayName)")
+    } else {
+        print("active schedule now: none (base mode)")
+    }
     if let battery = Battery.read() {
         print("battery: \(battery.percent)% onAC=\(battery.onACPower) " +
               "charging=\(battery.isCharging) charged=\(battery.isCharged)")
-        print("desired LED for current config: \(HelperConfig.load().desiredColor(for: battery))")
+        print("resolved LED for current config: \(probeConfig.resolvedColor(for: battery))")
     } else {
         print("no internal battery found")
     }
@@ -104,8 +126,8 @@ final class Daemon {
         watchConfigDirectory()
         installSignalHandlers()
 
-        // Safety net in case an event is missed.
-        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+        // Re-evaluate every 30s so time- and sun-based schedules flip promptly.
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             self?.evaluate()
         }
         RunLoop.main.add(timer, forMode: .default)
@@ -252,7 +274,7 @@ final class Daemon {
     func evaluate() {
         let battery = Battery.read()
         evaluateChargeToFull(battery: battery)
-        let desired = config.desiredColor(for: battery)
+        let desired = config.resolvedColor(for: battery)
         let onAC = battery?.onACPower ?? false
 
         // Re-assert on every re-plug even if the value is unchanged: a fresh

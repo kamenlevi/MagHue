@@ -16,19 +16,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var helper: HelperManager!
     private var settings: Settings!
     private var monitor: BatteryMonitor!
+    private var location: LocationProvider!
     private var statusItemController: StatusItemController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         helper = HelperManager()
         settings = Settings(helper: helper)
         monitor = BatteryMonitor(settings: settings)
+        location = LocationProvider()
+        location.onLocation = { [weak settings] coordinate in
+            settings?.setLocation(latitude: coordinate.latitude,
+                                  longitude: coordinate.longitude)
+        }
         statusItemController = StatusItemController(settings: settings,
                                                     helper: helper,
-                                                    monitor: monitor)
+                                                    monitor: monitor,
+                                                    location: location)
         // Make sure the helper's config matches the app's settings on launch.
         settings.pushToHelper()
         if settings.notifyOnThreshold {
             monitor.requestNotificationPermission()
+        }
+        // Refresh cached coordinates if solar schedules exist and we're allowed.
+        if settings.needsLocation {
+            location.request()
         }
     }
 }

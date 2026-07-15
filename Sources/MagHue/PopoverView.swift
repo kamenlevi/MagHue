@@ -5,14 +5,39 @@ struct PopoverView: View {
     @ObservedObject var settings: Settings
     @ObservedObject var helper: HelperManager
     @ObservedObject var monitor: BatteryMonitor
+    @ObservedObject var location: LocationProvider
     @State private var systemChargeStatus: String?
+    @State private var tab: Tab = .light
+
+    private enum Tab: Hashable { case light, automation }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             header
 
             if helper.isInstalled {
-                controls
+                Picker("", selection: $tab) {
+                    Text("Light").tag(Tab.light)
+                    Text("Automation").tag(Tab.automation)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 9) {
+                        switch tab {
+                        case .light:
+                            controls
+                            Divider()
+                            options
+                        case .automation:
+                            automation
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+                .frame(maxHeight: 440)
+
                 if helper.needsUpdate {
                     updatePrompt
                 }
@@ -26,8 +51,6 @@ struct PopoverView: View {
                     .foregroundStyle(.red)
             }
 
-            Divider()
-            options
             Divider()
             footer
         }
@@ -180,6 +203,57 @@ struct PopoverView: View {
         .font(.callout)
     }
 
+    // MARK: - Automation
+
+    private var automation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if settings.schedules.isEmpty {
+                Text("Schedule the light to change at set times — for example, off from sunset to sunrise every day.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach($settings.schedules) { $schedule in
+                    ScheduleEditor(schedule: $schedule) {
+                        settings.deleteSchedule(id: schedule.id)
+                    }
+                }
+            }
+
+            Button {
+                settings.addSchedule()
+                ensureLocationIfNeeded()
+            } label: {
+                Label("Add Schedule", systemImage: "plus")
+            }
+
+            if settings.needsLocation {
+                locationNote
+            }
+        }
+        .onChange(of: settings.schedules) { _, _ in ensureLocationIfNeeded() }
+    }
+
+    @ViewBuilder
+    private var locationNote: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(location.lastError ?? "Sunrise/sunset schedules need your location to know when the sun rises and sets.")
+                .font(.caption)
+                .foregroundStyle(location.lastError == nil ? Color.secondary : Color.red)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Use My Location") { location.request() }
+                .font(.caption)
+        }
+    }
+
+    private func ensureLocationIfNeeded() {
+        if settings.needsLocation,
+           location.authorization == .authorized
+            || location.authorization == .authorizedAlways {
+            location.request()
+        }
+    }
+
     private var footer: some View {
         HStack {
             if helper.isInstalled {
@@ -203,7 +277,7 @@ struct PopoverView: View {
         // The LED's "charging" color: amber, as Apple calls it.
         let ledAmber = Color(red: 1.0, green: 0.55, blue: 0.1)
         let color: Color
-        switch settings.helperConfig.desiredColor(for: monitor.state) {
+        switch settings.helperConfig.resolvedColor(for: monitor.state) {
         case .green: color = .green
         case .amber: color = ledAmber
         case .off: color = Color(nsColor: .darkGray)

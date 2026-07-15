@@ -30,5 +30,7 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MagHue uses your location only to calculate local sunrise and sunset times for sunrise/sunset lighting schedules. Your location never leaves your Mac.</string>
 </dict>
 </plist>

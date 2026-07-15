@@ -29,15 +29,27 @@ final class Settings: ObservableObject {
     }
     @Published var launchAtLoginError: String?
 
+    /// Automation rules. These live in the helper config file (shared source
+    /// of truth); the app edits them and mirrors changes to the helper.
+    @Published var schedules: [Schedule] {
+        didSet { pushToHelper() }
+    }
+    @Published private(set) var latitude: Double?
+    @Published private(set) var longitude: Double?
+
     private let defaults = UserDefaults.standard
     let helper: HelperManager
 
     init(helper: HelperManager) {
         self.helper = helper
+        let config = HelperConfig.load()
         mode = LEDMode(rawValue: defaults.string(forKey: "mode") ?? "") ?? .auto
         let stored = defaults.integer(forKey: "threshold")
         threshold = stored == 0 ? 80 : stored
-        chargeToFull = HelperConfig.load().chargeToFull
+        chargeToFull = config.chargeToFull
+        schedules = config.schedules
+        latitude = config.latitude
+        longitude = config.longitude
         showPercentInMenuBar = defaults.bool(forKey: "showPercentInMenuBar")
         notifyOnThreshold = defaults.bool(forKey: "notifyOnThreshold")
 
@@ -51,11 +63,36 @@ final class Settings: ObservableObject {
     }
 
     var helperConfig: HelperConfig {
-        HelperConfig(mode: mode, threshold: threshold, chargeToFull: chargeToFull)
+        HelperConfig(mode: mode, threshold: threshold, chargeToFull: chargeToFull,
+                     schedules: schedules, latitude: latitude, longitude: longitude)
     }
 
     func pushToHelper() {
         helper.write(config: helperConfig)
+    }
+
+    // MARK: - Schedules
+
+    func addSchedule() {
+        schedules.append(Schedule())
+    }
+
+    func deleteSchedule(id: Schedule.ID) {
+        schedules.removeAll { $0.id == id }
+    }
+
+    /// True if any enabled schedule needs a location we don't have yet.
+    var needsLocation: Bool {
+        latitude == nil && schedules.contains { schedule in
+            schedule.enabled &&
+                (schedule.start.kind != .clock || schedule.end.kind != .clock)
+        }
+    }
+
+    func setLocation(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+        pushToHelper()
     }
 
     /// Picks up changes the helper made to the config file, e.g. clearing
