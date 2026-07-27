@@ -68,6 +68,8 @@ final class Settings: ObservableObject {
     }
 
     func pushToHelper() {
+        // Rendering README screenshots must not touch the real config file.
+        guard !ScreenshotMode.isActive else { return }
         helper.write(config: helperConfig)
     }
 

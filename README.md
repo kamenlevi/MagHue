@@ -8,13 +8,18 @@ to 80% and the LED turns green the moment your battery reaches 80% while
 charging, and back to amber if it ever drops below. Perfect if you use a
 charge limit and your Mac never *reaches* 100%.
 
+<p align="center">
+  <img src="docs/popover-light.png" alt="MagHue's popover: LED mode picker, threshold slider and options" width="356">
+  <img src="docs/popover-automation.png" alt="MagHue's Automation tab: light off from sunset to sunrise on weekdays" width="356">
+</p>
+
 ## Features
 
 - **Threshold slider** — pick the battery percentage (10–100%) at which the LED
   turns green while on power; below it the LED shows the usual amber.
-- **Three plain-language LED modes** — *Turn green early* (green at your chosen
-  level), *Keep the light off* (dark while plugged in), or *Leave it to macOS*
-  (stock behavior). Each is labelled with a one-line explanation in the app.
+- **Three LED modes** — *Custom* (green at your chosen level, amber below it),
+  *Off* (dark while plugged in), or *System* (stock macOS behavior). Each has a
+  one-line explanation in the app.
 - **Charge to Full once** — a one-shot button that lifts the macOS charge limit
   so the battery fills to 100% this time (handy before travel), then restores
   your limit automatically once it's full. Shown only on Macs whose firmware
@@ -96,6 +101,15 @@ sudo rm -rf "/Library/Application Support/MagHue" /Library/Logs/MagHue
   `ACLC` key and what the current battery state is.
 - Helper logs: `/Library/Logs/MagHue/helper.log` and
   `log show --predicate 'subsystem == "com.kamenlevi.maghue"' --last 1h`.
+
+## Development
+
+- `make app` builds `dist/MagHue.app`, `make install` copies it to
+  `/Applications`, `make zip` packages it.
+- `dist/MagHue.app/Contents/MacOS/MagHue --screenshot docs` re-renders the
+  README images above from the live interface. It draws into an offscreen
+  bitmap (no screen-recording permission needed) and writes nothing to your
+  settings or the helper's config file.
 
 ## License
 

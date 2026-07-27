@@ -27,13 +27,22 @@ struct PopoverView: View {
     @ObservedObject var monitor: BatteryMonitor
     @ObservedObject var location: LocationProvider
     @State private var systemChargeStatus: String?
-    @State private var tab: Tab = .light
+    @State private var tab: Tab
     /// Scroll geometry, used to hint that there's more content below.
     @State private var contentHeight: CGFloat = 0
     @State private var viewportHeight: CGFloat = 0
     @State private var scrollOffset: CGFloat = 0
 
-    private enum Tab: Hashable { case light, automation }
+    enum Tab: Hashable { case light, automation }
+
+    init(settings: Settings, helper: HelperManager, monitor: BatteryMonitor,
+         location: LocationProvider, initialTab: Tab = .light) {
+        self.settings = settings
+        self.helper = helper
+        self.monitor = monitor
+        self.location = location
+        _tab = State(initialValue: initialTab)
+    }
 
     private static let scrollSpace = "popoverScroll"
     private static let bottomAnchor = "popoverBottom"
