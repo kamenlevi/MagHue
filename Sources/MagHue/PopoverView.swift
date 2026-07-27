@@ -1,6 +1,26 @@
 import MagHueCore
 import SwiftUI
 
+/// How tall the scrolling content is and how far it has been scrolled.
+private struct ScrollMetrics: Equatable {
+    var content: CGFloat = 0
+    var offset: CGFloat = 0
+}
+
+private struct ScrollMetricsKey: PreferenceKey {
+    static let defaultValue = ScrollMetrics()
+    static func reduce(value: inout ScrollMetrics, nextValue: () -> ScrollMetrics) {
+        value = nextValue()
+    }
+}
+
+private struct ViewportHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct PopoverView: View {
     @ObservedObject var settings: Settings
     @ObservedObject var helper: HelperManager
@@ -8,8 +28,27 @@ struct PopoverView: View {
     @ObservedObject var location: LocationProvider
     @State private var systemChargeStatus: String?
     @State private var tab: Tab = .light
+    /// Scroll geometry, used to hint that there's more content below.
+    @State private var contentHeight: CGFloat = 0
+    @State private var viewportHeight: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
 
     private enum Tab: Hashable { case light, automation }
+
+    private static let scrollSpace = "popoverScroll"
+    private static let bottomAnchor = "popoverBottom"
+
+    /// True while part of the scrolling content is still below the fold.
+    private var hasMoreBelow: Bool {
+        contentHeight - scrollOffset - viewportHeight > 2
+    }
+
+    /// Keep the whole popover on screen: never let the scroll area grow past
+    /// what's left under the menu bar once the header and footer are placed.
+    private var maxScrollHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return min(440, max(200, screen - 240))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -23,20 +62,7 @@ struct PopoverView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 9) {
-                        switch tab {
-                        case .light:
-                            controls
-                            Divider()
-                            options
-                        case .automation:
-                            automation
-                        }
-                    }
-                    .padding(.horizontal, 1)
-                }
-                .frame(maxHeight: 440)
+                scrollingBody
 
                 if helper.needsUpdate {
                     updatePrompt
@@ -59,6 +85,86 @@ struct PopoverView: View {
     }
 
     // MARK: - Sections
+
+    /// The tab's content, in a scroll area that shows when there's more below:
+    /// the last line fades out and a chevron appears that jumps to the end.
+    private var scrollingBody: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 9) {
+                    switch tab {
+                    case .light:
+                        controls
+                        Divider()
+                        options
+                    case .automation:
+                        automation
+                    }
+                    Color.clear.frame(height: 1).id(Self.bottomAnchor)
+                }
+                .padding(.horizontal, 1)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: ScrollMetricsKey.self,
+                            value: ScrollMetrics(
+                                content: geo.size.height,
+                                offset: -geo.frame(in: .named(Self.scrollSpace)).minY
+                            )
+                        )
+                    }
+                )
+            }
+            .coordinateSpace(name: Self.scrollSpace)
+            .scrollIndicators(.visible)
+            .frame(maxHeight: maxScrollHeight)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: ViewportHeightKey.self, value: geo.size.height)
+                }
+            )
+            .mask(bottomFade)
+            .overlay(alignment: .bottom) { moreBelowHint(proxy) }
+            .onPreferenceChange(ScrollMetricsKey.self) { metrics in
+                contentHeight = metrics.content
+                scrollOffset = metrics.offset
+            }
+            .onPreferenceChange(ViewportHeightKey.self) { viewportHeight = $0 }
+        }
+    }
+
+    /// Softens the bottom edge while content continues past it.
+    private var bottomFade: some View {
+        VStack(spacing: 0) {
+            Rectangle().fill(.black)
+            LinearGradient(
+                colors: [.black, .black.opacity(hasMoreBelow ? 0.05 : 1)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 18)
+        }
+        .animation(.easeInOut(duration: 0.15), value: hasMoreBelow)
+    }
+
+    private func moreBelowHint(_ proxy: ScrollViewProxy) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
+            }
+        } label: {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(.quaternary))
+        }
+        .buttonStyle(.plain)
+        .help("There's more below — click to scroll down")
+        .opacity(hasMoreBelow ? 1 : 0)
+        .animation(.easeInOut(duration: 0.15), value: hasMoreBelow)
+    }
 
     private var header: some View {
         HStack(spacing: 8) {
@@ -100,7 +206,7 @@ struct PopoverView: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: 6) {
             Picker("LED", selection: $settings.mode) {
-                Text("Automatic").tag(LEDMode.auto)
+                Text("Custom").tag(LEDMode.auto)
                 Text("Off").tag(LEDMode.off)
                 Text("System").tag(LEDMode.system)
             }
@@ -255,19 +361,24 @@ struct PopoverView: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 8) {
             if helper.isInstalled {
-                Button("Uninstall Helper") { helper.uninstall() }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Button {
+                    helper.uninstall()
+                } label: {
+                    Label("Uninstall Helper", systemImage: "trash")
+                }
             }
             Spacer()
-            Button("Quit MagHue") { NSApp.terminate(nil) }
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                Label("Quit MagHue", systemImage: "power")
+            }
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .font(.caption)
     }
 
     // MARK: - Helpers

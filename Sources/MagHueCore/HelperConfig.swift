@@ -35,7 +35,7 @@ public enum ScheduleAction: String, Codable, CaseIterable {
         case .green: return "Green"
         case .amber: return "Amber"
         case .system: return "System"
-        case .automatic: return "Automatic"
+        case .automatic: return "Custom"
         }
     }
 }

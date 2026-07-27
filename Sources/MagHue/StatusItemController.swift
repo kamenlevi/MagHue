@@ -19,12 +19,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         self.helper = helper
         self.monitor = monitor
         self.location = location
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // Variable length: a square item is too narrow for the percentage
+        // text, which then wraps into a column of digits.
+        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(togglePopover)
+            button.lineBreakMode = .byClipping
+            button.cell?.usesSingleLineMode = true
         }
 
         popover.behavior = .transient
@@ -60,9 +64,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         button.image = Self.magSafeIcon()
         button.imagePosition = .imageLeading
         if settings.showPercentInMenuBar, let percent = monitor.state?.percent {
-            button.title = " \(percent)%"
+            button.attributedTitle = NSAttributedString(
+                string: " \(percent)%",
+                attributes: [
+                    .font: NSFont.monospacedDigitSystemFont(
+                        ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
+                ]
+            )
+            statusItem.length = NSStatusItem.variableLength
         } else {
             button.title = ""
+            statusItem.length = NSStatusItem.squareLength
         }
     }
 

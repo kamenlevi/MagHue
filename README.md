@@ -22,7 +22,7 @@ charge limit and your Mac never *reaches* 100%.
 - **Automation** — an Automation tab where you schedule the light to change at
   set times: pick the days, a start and end (a clock time, or **sunset** /
   **sunrise**), and what the light does in that window (Off, Green, Amber,
-  System, or Automatic). For example, keep the light off from sunset to sunrise
+  System, or Custom). For example, keep the light off from sunset to sunrise
   every day. Sunrise/sunset are computed locally from your location — no network.
 - Optional extras: battery percentage in the menu bar and a notification when
   the threshold is reached (both off by default). Launch at login is on by
