@@ -78,6 +78,9 @@ straight back to the system. Open-source tools like
 helper resets the LED to system control whenever it shuts down or is
 uninstalled.
 
+[SECURITY.md](SECURITY.md) spells out what runs with which privileges, every
+SMC key the helper writes, and how to report a problem privately.
+
 ## Uninstall
 
 Click **Uninstall Helper** in the popover (asks for your password, removes the
