@@ -29,9 +29,8 @@ charge limit and your Mac never *reaches* 100%.
   **sunrise**), and what the light does in that window (Off, Green, Amber,
   System, or Custom). For example, keep the light off from sunset to sunrise
   every day. Sunrise/sunset are computed locally from your location — no network.
-- Optional extras: battery percentage in the menu bar and a notification when
-  the threshold is reached (both off by default). Launch at login is on by
-  default and can be turned off.
+- Optional extras: a notification when the threshold is reached (off by
+  default). Launch at login is on by default and can be turned off.
 - Works even when the app is closed — a tiny background helper keeps the LED
   correct at all times.
 

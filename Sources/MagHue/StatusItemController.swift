@@ -19,16 +19,13 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         self.helper = helper
         self.monitor = monitor
         self.location = location
-        // Variable length: a square item is too narrow for the percentage
-        // text, which then wraps into a column of digits.
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(togglePopover)
-            button.lineBreakMode = .byClipping
-            button.cell?.usesSingleLineMode = true
+            button.image = Self.magSafeIcon()
         }
 
         popover.behavior = .transient
@@ -44,20 +41,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         hosting.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hosting
 
-        settings.$showPercentInMenuBar
-            .combineLatest(monitor.$state)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _, _ in
-                self?.updateButton()
-            }
-            .store(in: &cancellables)
-        updateButton()
-
-        // Showing or hiding the percentage resizes the status item, which moves
-        // the icon; the popover follows it immediately, on every step of the
-        // move. Animating instead makes it lag behind and wander, because the
-        // menu bar passes through intermediate positions on the way — moving
-        // in lockstep reads as the popover being attached to the icon.
+        // MagHue's own item is a fixed-width icon, but the ones around it come
+        // and go, which shifts ours along the bar. Follow it immediately, on
+        // every step of the move, so an open popover stays attached to it.
         NotificationCenter.default
             .publisher(for: NSWindow.didMoveNotification)
             .merge(with: NotificationCenter.default.publisher(for: NSWindow.didResizeNotification))
@@ -90,25 +76,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             }
         }
         return nil
-    }
-
-    private func updateButton() {
-        guard let button = statusItem.button else { return }
-        button.image = Self.magSafeIcon()
-        button.imagePosition = .imageLeading
-        if settings.showPercentInMenuBar, let percent = monitor.state?.percent {
-            button.attributedTitle = NSAttributedString(
-                string: " \(percent)%",
-                attributes: [
-                    .font: NSFont.monospacedDigitSystemFont(
-                        ofSize: NSFont.systemFontSize(for: .small), weight: .regular)
-                ]
-            )
-            statusItem.length = NSStatusItem.variableLength
-        } else {
-            button.title = ""
-            statusItem.length = NSStatusItem.squareLength
-        }
     }
 
     /// Places the popover as it opens, before it's on screen, so there's

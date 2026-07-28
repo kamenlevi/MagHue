@@ -4,8 +4,8 @@ import IOKit.ps
 import MagHueCore
 import UserNotifications
 
-/// App-side battery watcher: drives the menu bar percentage and the optional
-/// threshold notification. LED changes are the helper's job, not ours.
+/// App-side battery watcher: drives the LED preview in the popover and the
+/// optional threshold notification. LED changes are the helper's job, not ours.
 final class BatteryMonitor: ObservableObject {
     @Published private(set) var state: BatteryState?
 

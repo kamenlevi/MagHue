@@ -18,9 +18,6 @@ final class Settings: ObservableObject {
     @Published var chargeToFull: Bool {
         didSet { if chargeToFull != oldValue { pushToHelper() } }
     }
-    @Published var showPercentInMenuBar: Bool {
-        didSet { defaults.set(showPercentInMenuBar, forKey: "showPercentInMenuBar") }
-    }
     @Published var notifyOnThreshold: Bool {
         didSet { defaults.set(notifyOnThreshold, forKey: "notifyOnThreshold") }
     }
@@ -50,7 +47,6 @@ final class Settings: ObservableObject {
         schedules = config.schedules
         latitude = config.latitude
         longitude = config.longitude
-        showPercentInMenuBar = defaults.bool(forKey: "showPercentInMenuBar")
         notifyOnThreshold = defaults.bool(forKey: "notifyOnThreshold")
 
         // Launch at login defaults to on: register it the first time the app

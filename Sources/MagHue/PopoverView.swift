@@ -185,7 +185,6 @@ struct PopoverView: View {
     private var options: some View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("Launch at login", isOn: $settings.launchAtLogin)
-            Toggle("Show percentage in menu bar", isOn: $settings.showPercentInMenuBar)
             Toggle("Notify when threshold is reached", isOn: $settings.notifyOnThreshold)
                 .onChange(of: settings.notifyOnThreshold) { _, enabled in
                     if enabled { monitor.requestNotificationPermission() }
