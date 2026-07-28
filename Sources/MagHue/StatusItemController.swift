@@ -53,6 +53,21 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             .store(in: &cancellables)
         updateButton()
 
+        // The status item's window moves when the item's width changes; that's
+        // the signal that the menu bar has finished re-laying out, and the
+        // moment to put the popover back under the icon.
+        NotificationCenter.default
+            .publisher(for: NSWindow.didMoveNotification)
+            .merge(with: NotificationCenter.default.publisher(for: NSWindow.didResizeNotification))
+            .sink { [weak self] note in
+                guard let self, self.popover.isShown,
+                      let moved = note.object as? NSWindow,
+                      moved === self.statusItem.button?.window,
+                      let button = self.statusItem.button else { return }
+                self.placePopover(under: button)
+            }
+            .store(in: &cancellables)
+
         // Opening the popover activates MagHue, so switching to any other app
         // means the user is done with it — close it rather than leaving it
         // floating over their work. `.transient` alone doesn't cover this.
@@ -92,6 +107,28 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             button.title = ""
             statusItem.length = NSStatusItem.squareLength
         }
+        // Turning the percentage on or off resizes the status item, which
+        // moves the icon. AppKit nudges a visible popover by the difference
+        // instead of re-anchoring it, so it drifts a little further away with
+        // every toggle — place it again ourselves once the bar has settled.
+        if popover.isShown {
+            anchorPopoverUnderStatusItem()
+        }
+    }
+
+    /// Re-places the popover under the status item. The menu bar re-lays out
+    /// asynchronously — and not within one pass of the run loop — so this also
+    /// runs again over the next moment, until the icon stops moving.
+    private func anchorPopoverUnderStatusItem() {
+        guard let button = statusItem.button else { return }
+        placePopover(under: button)
+        for delay in [0.0, 0.05, 0.15, 0.3] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.popover.isShown,
+                      let button = self.statusItem.button else { return }
+                self.placePopover(under: button)
+            }
+        }
     }
 
     @objc private func togglePopover() {
@@ -105,23 +142,22 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate(ignoringOtherApps: true)
-            fixPopoverPosition(under: button)
-            DispatchQueue.main.async { [weak self] in
-                guard let self, let button = self.statusItem.button else { return }
-                self.fixPopoverPosition(under: button)
-            }
+            anchorPopoverUnderStatusItem()
         }
     }
 
+    /// Puts the popover directly under the status item.
+    ///
     /// macOS 26 sometimes places status item popovers too high, overlapping
-    /// the menu bar with the arrow pushed off-screen. If that happened, move
-    /// the popover window so its top (and arrow) sits right below the icon.
-    private func fixPopoverPosition(under button: NSStatusBarButton) {
+    /// the menu bar with the arrow pushed off-screen, so MagHue positions it
+    /// itself. The placement is absolute rather than a nudge: it is worked out
+    /// from the icon's current position every time, so repeated calls always
+    /// land in the same place instead of accumulating an offset.
+    private func placePopover(under button: NSStatusBarButton) {
         guard let popWindow = popover.contentViewController?.view.window,
               let iconWindow = button.window else { return }
         let icon = iconWindow.convertToScreen(button.convert(button.bounds, to: nil))
         var frame = popWindow.frame
-        guard frame.maxY > icon.minY else { return } // already placed correctly
 
         frame.origin.y = icon.minY - frame.height
         frame.origin.x = icon.midX - frame.width / 2
@@ -129,6 +165,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             frame.origin.x = min(max(frame.origin.x, screen.visibleFrame.minX + 4),
                                  screen.visibleFrame.maxX - frame.width - 4)
         }
-        popWindow.setFrame(frame, display: true)
+        if frame != popWindow.frame {
+            popWindow.setFrame(frame, display: true)
+        }
     }
 }
