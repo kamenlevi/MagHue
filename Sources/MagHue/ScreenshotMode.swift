@@ -13,18 +13,19 @@ enum ScreenshotMode {
     /// True while the app is rendering README images rather than running.
     private(set) static var isActive = false
 
-    /// Runs the screenshot pass if `--screenshot <directory>` was passed, and
-    /// returns true if it did (in which case the app should not start up).
-    static func runIfRequested() -> Bool {
+    /// The directory to write into, if `--screenshot <directory>` was passed.
+    static func requestedDirectory() -> URL? {
         let args = CommandLine.arguments
-        guard let flag = args.firstIndex(of: "--screenshot") else { return false }
-        let directory = args.indices.contains(flag + 1) ? args[flag + 1] : "docs"
+        guard let flag = args.firstIndex(of: "--screenshot") else { return nil }
+        let path = args.indices.contains(flag + 1) ? args[flag + 1] : "docs"
         isActive = true
-        run(into: URL(fileURLWithPath: directory))
-        return true
+        return URL(fileURLWithPath: path)
     }
 
-    private static func run(into directory: URL) {
+    /// Runs the capture inside the normal app lifecycle: the shots are taken
+    /// from a real, active, key window, so controls draw in their accent
+    /// colours instead of the greys AppKit uses for inactive windows.
+    static func run(into directory: URL) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let helper = HelperManager()
@@ -34,57 +35,97 @@ enum ScreenshotMode {
 
         capture(PopoverView(settings: settings, helper: helper, monitor: monitor,
                             location: location),
-                to: directory.appendingPathComponent("popover-light.png"))
-
-        // A sample rule for the Automation tab: light off from sunset to
-        // sunrise on weekdays. The coordinates only stop the "needs location"
-        // note from appearing; they never reach the config file here.
-        settings.setLocation(latitude: 42.70, longitude: 23.32)
-        settings.schedules = [
-            Schedule(days: [2, 3, 4, 5, 6], start: .sunset, end: .sunrise, action: .off)
-        ]
-        capture(PopoverView(settings: settings, helper: helper, monitor: monitor,
-                            location: location, initialTab: .automation),
-                to: directory.appendingPathComponent("popover-automation.png"))
+                to: directory.appendingPathComponent("popover-light.png")) {
+            // A sample rule for the Automation tab: light off from sunset to
+            // sunrise on weekdays. The coordinates only stop the "needs
+            // location" note appearing; they never reach the config file here.
+            settings.setLocation(latitude: 42.70, longitude: 23.32)
+            settings.schedules = [
+                Schedule(days: [2, 3, 4, 5, 6], start: .sunset, end: .sunrise, action: .off)
+            ]
+            capture(PopoverView(settings: settings, helper: helper, monitor: monitor,
+                                location: location, initialTab: .automation),
+                    to: directory.appendingPathComponent("popover-automation.png")) {
+                NSApp.terminate(nil)
+            }
+        }
     }
 
     // MARK: - Rendering
 
-    /// Draws a view through a real (offscreen) window so the AppKit-backed
-    /// controls — sliders, segmented pickers, checkboxes — come out as they
-    /// look in the app, then mats the result on a soft rounded backdrop.
-    private static func capture(_ view: some View, to url: URL) {
+    /// Draws a view through a real window so the AppKit-backed controls —
+    /// sliders, segmented pickers, switches — come out as they look in the
+    /// app, then mats the result on a soft rounded backdrop.
+    private static func capture(_ view: some View, to url: URL,
+                                then next: @escaping () -> Void) {
         let hosting = NSHostingView(rootView: view)
         hosting.frame = NSRect(origin: .zero, size: hosting.fittingSize)
 
-        let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless],
-                              backing: .buffered, defer: false)
+        let window = KeyableWindow(contentRect: hosting.frame, styleMask: [.borderless],
+                                   backing: .buffered, defer: false)
         window.contentView = hosting
         window.backgroundColor = .windowBackgroundColor
         window.isOpaque = true
-        window.alphaValue = 0            // present but invisible while it lays out
-        window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
-        // Key + active, or AppKit draws every control in its inactive grey.
+        window.ignoresMouseEvents = true
+        // On screen (AppKit won't make an offscreen window key) but invisible.
+        window.alphaValue = 0.01
+        if let visible = NSScreen.main?.visibleFrame {
+            window.setFrameOrigin(NSPoint(x: visible.minX + 20, y: visible.minY + 20))
+        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
         // Let SwiftUI settle: layout, preference updates, the battery read.
-        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
-        hosting.frame = NSRect(origin: .zero, size: hosting.fittingSize)
-        window.setContentSize(hosting.fittingSize)
-        hosting.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-
-        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
-            FileHandle.standardError.write(Data("could not create bitmap\n".utf8))
-            return
+        after(0.9) {
+            window.setContentSize(hosting.fittingSize)
+            hosting.layoutSubtreeIfNeeded()
+            after(0.4) {
+                guard let shot = bitmap(of: hosting) else {
+                    FileHandle.standardError.write(Data("could not create bitmap\n".utf8))
+                    return next()
+                }
+                window.orderOut(nil)
+                write(matted(shot), to: url)
+                next()
+            }
         }
-        hosting.cacheDisplay(in: hosting.bounds, to: rep)
-        window.orderOut(nil)
+    }
 
-        let shot = NSImage(size: hosting.bounds.size)
-        shot.addRepresentation(rep)
-        write(matted(shot), to: url)
+    /// Renders the view's layer tree. `cacheDisplay(in:to:)` misses controls
+    /// whose tint lives in private sublayers — the schedule switch came out
+    /// grey — so go through Core Animation instead.
+    private static func bitmap(of view: NSView) -> NSImage? {
+        let bounds = view.bounds
+        let scale = view.window?.backingScaleFactor ?? 2
+        guard let layer = view.layer,
+              let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(bounds.width * scale), pixelsHigh: Int(bounds.height * scale),
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        else { return nil }
+        // Point size first: the context takes its scale from the rep's size.
+        rep.size = bounds.size
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return nil }
+
+        let cg = context.cgContext
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        NSColor.windowBackgroundColor.setFill()
+        bounds.fill()
+        // Core Animation draws top-down; the bitmap context is bottom-up.
+        cg.translateBy(x: 0, y: bounds.height)
+        cg.scaleBy(x: 1, y: -1)
+        layer.render(in: cg)
+        NSGraphicsContext.restoreGraphicsState()
+
+        let image = NSImage(size: bounds.size)
+        image.addRepresentation(rep)
+        return image
+    }
+
+    private static func after(_ seconds: Double, _ work: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
     /// Puts the popover on a padded backdrop with rounded corners and a soft
@@ -148,5 +189,27 @@ enum ScreenshotMode {
         } catch {
             FileHandle.standardError.write(Data("write failed: \(error)\n".utf8))
         }
+    }
+}
+
+/// A borderless window refuses key status by default, and a window that isn't
+/// key draws its controls untinted — which is what turned the schedule switch
+/// grey in the first round of screenshots.
+private final class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+/// Delegate used only by `--screenshot`: renders the images, then quits.
+final class ScreenshotDelegate: NSObject, NSApplicationDelegate {
+    private let directory: URL
+
+    init(directory: URL) {
+        self.directory = directory
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.activate(ignoringOtherApps: true)
+        ScreenshotMode.run(into: directory)
     }
 }

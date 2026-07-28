@@ -4,13 +4,17 @@ import AppKit
 enum MagHueMain {
     static func main() {
         let app = NSApplication.shared
-        // `--screenshot <dir>` renders the popover to PNGs and exits.
-        app.setActivationPolicy(.accessory)
-        if ScreenshotMode.runIfRequested() { return }
-        let delegate = AppDelegate()
-        app.delegate = delegate
         // Menu bar only: no Dock icon, no app switcher entry.
         app.setActivationPolicy(.accessory)
+        // `--screenshot <dir>` renders the popover to PNGs and quits.
+        if let directory = ScreenshotMode.requestedDirectory() {
+            let delegate = ScreenshotDelegate(directory: directory)
+            app.delegate = delegate
+            app.run()
+            return
+        }
+        let delegate = AppDelegate()
+        app.delegate = delegate
         app.run()
     }
 }

@@ -52,11 +52,12 @@ struct PopoverView: View {
         contentHeight - scrollOffset - viewportHeight > 2
     }
 
-    /// Keep the whole popover on screen: never let the scroll area grow past
-    /// what's left under the menu bar once the header and footer are placed.
+    /// The popover grows to fit its content, so nothing normally needs
+    /// scrolling. The only limit is the screen: with a long list of schedules
+    /// the content area stops here and scrolls the rest.
     private var maxScrollHeight: CGFloat {
         let screen = NSScreen.main?.visibleFrame.height ?? 800
-        return min(440, max(200, screen - 240))
+        return max(320, screen - 200)
     }
 
     var body: some View {
