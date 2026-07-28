@@ -12,6 +12,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let monitor: BatteryMonitor
     private let location: LocationProvider
     private var cancellables: Set<AnyCancellable> = []
+    /// Set when the menu bar item wants redrawing but the popover is open.
+    private var buttonNeedsUpdate = false
 
     init(settings: Settings, helper: HelperManager, monitor: BatteryMonitor,
          location: LocationProvider) {
@@ -53,18 +55,21 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             .store(in: &cancellables)
         updateButton()
 
-        // The status item's window moves when the item's width changes; that's
-        // the signal that the menu bar has finished re-laying out, and the
-        // moment to put the popover back under the icon.
+        // The status item's window moves when the item's width changes, so
+        // that's the cue to put the popover back under the icon. The menu bar
+        // shuffles the item through intermediate positions on the way, though,
+        // so wait for it to stop moving and follow once, rather than chasing
+        // every step and juddering across the screen.
         NotificationCenter.default
             .publisher(for: NSWindow.didMoveNotification)
             .merge(with: NotificationCenter.default.publisher(for: NSWindow.didResizeNotification))
-            .sink { [weak self] note in
+            .compactMap { $0.object as? NSWindow }
+            .filter { [weak self] window in window === self?.statusItem.button?.window }
+            .debounce(for: .milliseconds(120), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
                 guard let self, self.popover.isShown,
-                      let moved = note.object as? NSWindow,
-                      moved === self.statusItem.button?.window,
                       let button = self.statusItem.button else { return }
-                self.placePopover(under: button)
+                self.placePopover(under: button, animated: true)
             }
             .store(in: &cancellables)
 
@@ -92,6 +97,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func updateButton() {
         guard let button = statusItem.button else { return }
+        // Changing the title resizes the status item, which moves the icon —
+        // and the popover hanging off it. Rather than have it slide about
+        // while the user is working in it (toggling the percentage, or the
+        // battery simply ticking over), hold the change until it closes.
+        guard !popover.isShown else {
+            buttonNeedsUpdate = true
+            return
+        }
+        buttonNeedsUpdate = false
         button.image = Self.magSafeIcon()
         button.imagePosition = .imageLeading
         if settings.showPercentInMenuBar, let percent = monitor.state?.percent {
@@ -107,27 +121,24 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             button.title = ""
             statusItem.length = NSStatusItem.squareLength
         }
-        // Turning the percentage on or off resizes the status item, which
-        // moves the icon. AppKit nudges a visible popover by the difference
-        // instead of re-anchoring it, so it drifts a little further away with
-        // every toggle — place it again ourselves once the bar has settled.
-        if popover.isShown {
-            anchorPopoverUnderStatusItem()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        if buttonNeedsUpdate {
+            updateButton()
         }
     }
 
-    /// Re-places the popover under the status item. The menu bar re-lays out
-    /// asynchronously — and not within one pass of the run loop — so this also
-    /// runs again over the next moment, until the icon stops moving.
+    /// Places the popover as it opens, before it's on screen, so there's
+    /// nothing to see: once immediately and once on the next pass of the run
+    /// loop, after AppKit has had its own go at positioning it.
     private func anchorPopoverUnderStatusItem() {
         guard let button = statusItem.button else { return }
         placePopover(under: button)
-        for delay in [0.0, 0.05, 0.15, 0.3] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self, self.popover.isShown,
-                      let button = self.statusItem.button else { return }
-                self.placePopover(under: button)
-            }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.popover.isShown,
+                  let button = self.statusItem.button else { return }
+            self.placePopover(under: button)
         }
     }
 
@@ -153,7 +164,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// itself. The placement is absolute rather than a nudge: it is worked out
     /// from the icon's current position every time, so repeated calls always
     /// land in the same place instead of accumulating an offset.
-    private func placePopover(under button: NSStatusBarButton) {
+    private func placePopover(under button: NSStatusBarButton, animated: Bool = false) {
         guard let popWindow = popover.contentViewController?.view.window,
               let iconWindow = button.window else { return }
         let icon = iconWindow.convertToScreen(button.convert(button.bounds, to: nil))
@@ -165,7 +176,16 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             frame.origin.x = min(max(frame.origin.x, screen.visibleFrame.minX + 4),
                                  screen.visibleFrame.maxX - frame.width - 4)
         }
-        if frame != popWindow.frame {
+        guard frame != popWindow.frame else { return }
+        if animated {
+            // Following the icon after the bar resizes: slide, so it reads as
+            // the popover keeping up rather than snapping about.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.16
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                popWindow.animator().setFrame(frame, display: true)
+            }
+        } else {
             popWindow.setFrame(frame, display: true)
         }
     }

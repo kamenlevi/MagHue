@@ -58,45 +58,41 @@ enum ScreenshotMode {
     /// app, then mats the result on a soft rounded backdrop.
     private static func capture(_ view: some View, to url: URL,
                                 then next: @escaping () -> Void) {
-        // Shown through a real NSPopover, exactly as the menu bar item does,
-        // so the image can't disagree with the app about size or scrolling.
-        let anchor = NSView(frame: NSRect(x: 0, y: 0, width: 24, height: 22))
-        let host = KeyableWindow(contentRect: anchor.frame, styleMask: [.borderless],
-                                 backing: .buffered, defer: false)
-        host.contentView = anchor
-        host.alphaValue = 0.01
-        host.ignoresMouseEvents = true
-        if let visible = NSScreen.main?.visibleFrame {
-            host.setFrameOrigin(NSPoint(x: visible.midX, y: visible.maxY - 30))
-        }
-        host.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        // The view is drawn in a window of its own rather than in a popover: a
+        // popover's window refuses key status, and AppKit draws the controls
+        // inside a window that isn't key in their inactive greys — switches
+        // come out grey instead of blue. The size is the same either way,
+        // because StatusItemController gives its hosting controller
+        // `sizingOptions = [.preferredContentSize]`, which is exactly the
+        // fitting size used here.
+        let hosting = NSHostingView(rootView: view)
+        hosting.frame = NSRect(origin: .zero, size: hosting.fittingSize)
 
-        let popover = NSPopover()
-        popover.behavior = .applicationDefined
-        popover.animates = false
-        // A popover window won't take key status here, which leaves AppKit
-        // controls in their inactive grey; this forces the key rendering.
-        let hosting = NSHostingController(
-            rootView: view.environment(\.controlActiveState, .key))
-        hosting.sizingOptions = [.preferredContentSize]   // as in StatusItemController
-        popover.contentViewController = hosting
-        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
-        // As StatusItemController does when it opens the popover; without it
-        // AppKit controls inside draw in their inactive grey.
-        popover.contentViewController?.view.window?.makeKey()
+        let window = KeyableWindow(contentRect: hosting.frame, styleMask: [.borderless],
+                                   backing: .buffered, defer: false)
+        window.contentView = hosting
+        window.backgroundColor = .windowBackgroundColor
+        window.isOpaque = true
+        window.ignoresMouseEvents = true
+        // On screen (AppKit won't make an offscreen window key) but invisible.
+        window.alphaValue = 0.01
+        if let visible = NSScreen.main?.visibleFrame {
+            window.setFrameOrigin(NSPoint(x: visible.minX + 20, y: visible.minY + 20))
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
 
         // Let SwiftUI settle: layout, preference updates, the battery read.
         after(1.0) {
-            guard let content = popover.contentViewController?.view else { return next() }
-            print("popover content size = \(content.bounds.size)")
-            after(0.3) {
-                guard let shot = bitmap(of: content) else {
+            window.setContentSize(hosting.fittingSize)
+            hosting.layoutSubtreeIfNeeded()
+            after(0.4) {
+                print("captured \(hosting.bounds.size) key=\(window.isKeyWindow)")
+                guard let shot = bitmap(of: hosting) else {
                     FileHandle.standardError.write(Data("could not create bitmap\n".utf8))
                     return next()
                 }
-                popover.performClose(nil)
-                host.orderOut(nil)
+                window.orderOut(nil)
                 write(matted(shot), to: url)
                 next()
             }
