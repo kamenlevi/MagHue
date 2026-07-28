@@ -23,10 +23,14 @@ struct ScheduleEditor: View {
 
                 Spacer()
 
+                // The switch is what turns the rule on, so it needs to look
+                // like the thing to press: grey while off, blue once on, and
+                // big enough to notice.
                 Toggle("", isOn: $schedule.enabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.mini)
+                    .controlSize(.small)
+                    .help(schedule.enabled ? "Turn this schedule off" : "Turn this schedule on")
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -50,7 +54,9 @@ struct ScheduleEditor: View {
         }
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.06)))
-        .opacity(schedule.enabled ? 1 : 0.55)
+        // Dimmed while off, but not so far that the controls stop reading as
+        // controls — this is the state the user has to click their way out of.
+        .opacity(schedule.enabled ? 1 : 0.8)
     }
 
     // MARK: - Anchor (time / sunset / sunrise)

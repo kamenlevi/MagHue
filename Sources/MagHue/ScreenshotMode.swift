@@ -86,6 +86,11 @@ enum ScreenshotMode {
         after(1.0) {
             window.setContentSize(hosting.fittingSize)
             hosting.layoutSubtreeIfNeeded()
+            // Claim key status again just before the shot: the second capture
+            // of a run would otherwise lose it when the first window closed,
+            // and its switches would draw grey.
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
             after(0.4) {
                 print("captured \(hosting.bounds.size) key=\(window.isKeyWindow)")
                 guard let shot = bitmap(of: hosting) else {

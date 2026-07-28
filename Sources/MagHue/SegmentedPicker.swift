@@ -1,5 +1,22 @@
 import SwiftUI
 
+/// A button that always shows its grey background, so it reads as something
+/// to press even when it's the only thing on an otherwise empty tab. The
+/// background deepens while it's held. Matches `SegmentedPicker`'s track.
+struct FilledButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .frame(maxWidth: .infinity)
+            .frame(height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.22 : 0.12))
+            )
+            .contentShape(Rectangle())
+    }
+}
+
 /// A segmented control drawn by hand.
 ///
 /// AppKit's own segmented control styles two- and three-segment pickers

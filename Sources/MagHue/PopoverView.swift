@@ -221,8 +221,10 @@ struct PopoverView: View {
                 settings.addSchedule()
                 ensureLocationIfNeeded()
             } label: {
-                Label("Add Schedule", systemImage: "plus")
+                Label(settings.schedules.isEmpty ? "Add Your First Schedule" : "Add Schedule",
+                      systemImage: "plus")
             }
+            .buttonStyle(FilledButtonStyle())
 
             if settings.needsLocation {
                 locationNote
