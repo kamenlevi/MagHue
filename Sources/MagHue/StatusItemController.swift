@@ -34,10 +34,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = false
         popover.delegate = self
-        popover.contentViewController = NSHostingController(
+        let hosting = NSHostingController(
             rootView: PopoverView(settings: settings, helper: helper,
                                   monitor: monitor, location: location)
         )
+        // Without this the controller never reports a preferred size, so the
+        // popover stays at its default 320pt height and the content has to
+        // scroll. With it, the popover grows and shrinks to fit the interface.
+        hosting.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = hosting
 
         settings.$showPercentInMenuBar
             .combineLatest(monitor.$state)
