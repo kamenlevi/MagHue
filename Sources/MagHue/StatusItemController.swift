@@ -52,6 +52,17 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             }
             .store(in: &cancellables)
         updateButton()
+
+        // Opening the popover activates MagHue, so switching to any other app
+        // means the user is done with it — close it rather than leaving it
+        // floating over their work. `.transient` alone doesn't cover this.
+        NotificationCenter.default
+            .publisher(for: NSApplication.didResignActiveNotification)
+            .sink { [weak self] _ in
+                guard let self, self.popover.isShown else { return }
+                self.popover.performClose(nil)
+            }
+            .store(in: &cancellables)
     }
 
     private static func magSafeIcon() -> NSImage? {

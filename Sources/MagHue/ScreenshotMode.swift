@@ -75,10 +75,16 @@ enum ScreenshotMode {
         let popover = NSPopover()
         popover.behavior = .applicationDefined
         popover.animates = false
-        let hosting = NSHostingController(rootView: view)
+        // A popover window won't take key status here, which leaves AppKit
+        // controls in their inactive grey; this forces the key rendering.
+        let hosting = NSHostingController(
+            rootView: view.environment(\.controlActiveState, .key))
         hosting.sizingOptions = [.preferredContentSize]   // as in StatusItemController
         popover.contentViewController = hosting
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+        // As StatusItemController does when it opens the popover; without it
+        // AppKit controls inside draw in their inactive grey.
+        popover.contentViewController?.view.window?.makeKey()
 
         // Let SwiftUI settle: layout, preference updates, the battery read.
         after(1.0) {
