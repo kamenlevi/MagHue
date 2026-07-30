@@ -37,12 +37,22 @@ enum ScreenshotMode {
                             location: location),
                 to: directory.appendingPathComponent("popover-light.png")) {
             // A sample rule for the Automation tab: light off from sunset to
-            // sunrise on weekdays. The coordinates only stop the "needs
-            // location" note appearing; they never reach the config file here.
+            // sunrise. The coordinates only stop the "needs location" note
+            // appearing; they never reach the config file here.
+            //
+            // The days deliberately exclude today and yesterday, so the rule
+            // is never active while the shot is taken — otherwise it would
+            // override the LED and the header would show a dark dot next to
+            // "on power", which reads as a bug in a screenshot.
             settings.setLocation(latitude: 42.70, longitude: 23.32)
+            let calendar = Calendar.current
+            let today = calendar.component(.weekday, from: Date())
+            let yesterday = today == 1 ? 7 : today - 1
+            let days = Set(1...7).subtracting([today, yesterday])
             settings.schedules = [
-                Schedule(days: [2, 3, 4, 5, 6], start: .sunset, end: .sunrise, action: .off)
+                Schedule(days: days, start: .sunset, end: .sunrise, action: .off)
             ]
+
             capture(PopoverView(settings: settings, helper: helper, monitor: monitor,
                                 location: location, initialTab: .automation),
                     to: directory.appendingPathComponent("popover-automation.png")) {
