@@ -115,4 +115,14 @@ sudo rm -rf "/Library/Application Support/MagHue" /Library/Logs/MagHue
 
 ## License
 
-MIT
+MagHue — choose when your MagSafe charger's LED turns green.
+Copyright © 2026 Kamen Levi.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See [LICENSE](LICENSE).
+
+In short: fork it, change it, ship it — but anything you distribute that's
+built on it has to stay under the GPL, with its source available. It can't be
+folded into a closed-source app.

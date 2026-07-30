@@ -29,7 +29,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>MIT License</string>
+	<string>© 2026 Kamen Levi. GNU General Public License v3.0 or later.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MagHue uses your location only to calculate local sunrise and sunset times for sunrise/sunset lighting schedules. Your location never leaves your Mac.</string>
 </dict>
