@@ -1,7 +1,15 @@
+import AppKit
 import MagHueCore
 import SwiftUI
 
 struct PopoverView: View {
+    /// PayPal donation link. The account (`DHQUELMQRQW46`) is Peter Levi's,
+    /// the same one Variety collects donations through; only the item name
+    /// differs, so a donation made here is recorded against MagHue.
+    private static let donateURL = URL(string:
+        "https://www.paypal.com/donate/?business=DHQUELMQRQW46&no_recurring=0"
+        + "&item_name=MagHue&currency_code=EUR")!
+
     @ObservedObject var settings: Settings
     @ObservedObject var helper: HelperManager
     @ObservedObject var monitor: BatteryMonitor
@@ -70,7 +78,31 @@ struct PopoverView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            donateButton
         }
+    }
+
+    /// Sits across from the title: small enough to ignore, clear enough to
+    /// find. Opens the PayPal page in the browser.
+    private var donateButton: some View {
+        Button {
+            NSWorkspace.shared.open(Self.donateURL)
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.pink)
+                Text("Donate")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.primary.opacity(0.12)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Support MagHue with a donation")
     }
 
     private var installPrompt: some View {
