@@ -9,8 +9,8 @@ charging, and back to amber if it ever drops below. Perfect if you use a
 charge limit and your Mac never *reaches* 100%.
 
 <p align="center">
-  <img src="docs/popover-light.png" alt="MagHue's popover: LED mode picker, threshold slider and options" width="356">
-  <img src="docs/popover-automation.png" alt="MagHue's Automation tab: light off from sunset to sunrise on weekdays" width="356">
+  <img src="docs/popover-light.png?v=2" alt="MagHue's popover: LED mode picker, threshold slider and options" width="356">
+  <img src="docs/popover-automation.png?v=2" alt="MagHue's Automation tab: light off from sunset to sunrise" width="356">
 </p>
 
 ## Features
