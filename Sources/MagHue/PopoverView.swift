@@ -1,11 +1,21 @@
-// Deliberately no `import AppKit` here. On the macOS 27 SDK it shadows
-// SwiftUI's State, which stops @State being a property wrapper at all: `$tab`
-// vanishes and assigning to a @State property reads as mutating the view.
-// SwiftUI re-exports what this file needs from AppKit anyway (NSWorkspace,
-// NSApp, NSColor), and the wrappers below are qualified so no future import
-// can shadow them either.
 import MagHueCore
 import SwiftUI
+
+/// The popover's interface state — what would normally be `@State` properties
+/// on the view. On the macOS 27 SDK `@State` is a compiler macro whose plugin
+/// (SwiftUIMacros) ships with Xcode but not with the Command Line Tools, so a
+/// CLT-only build fails to expand it: `$tab` vanishes and every assignment
+/// reads as mutating the view (#1). `ObservableObject`/`@Published` are plain
+/// property wrappers on every toolchain, so the state lives here instead.
+/// Deliberately no `@State` anywhere in this app.
+final class PopoverModel: ObservableObject {
+    @Published var tab: PopoverView.Tab
+    @Published var systemChargeStatus: String?
+
+    init(tab: PopoverView.Tab = .light) {
+        self.tab = tab
+    }
+}
 
 struct PopoverView: View {
     /// PayPal donation link. The account (`DHQUELMQRQW46`) is Peter Levi's,
@@ -15,18 +25,15 @@ struct PopoverView: View {
         "https://www.paypal.com/donate/?business=DHQUELMQRQW46&no_recurring=0"
         + "&item_name=MagHue&currency_code=EUR")!
 
-    @SwiftUI.ObservedObject var settings: Settings
-    @SwiftUI.ObservedObject var helper: HelperManager
-    @SwiftUI.ObservedObject var monitor: BatteryMonitor
-    @SwiftUI.ObservedObject var location: LocationProvider
-    /// Which tab to open on. Applied in `onAppear` rather than through a
-    /// custom init assigning `_tab`: that init was the only unusual thing
-    /// about this view's storage, and the macOS 27 build reports @State here
-    /// as not being a property wrapper at all.
-    var initialTab: Tab = .light
-
-    @SwiftUI.State private var systemChargeStatus: String? = nil
-    @SwiftUI.State private var tab: Tab = .light
+    @ObservedObject var settings: Settings
+    @ObservedObject var helper: HelperManager
+    @ObservedObject var monitor: BatteryMonitor
+    @ObservedObject var location: LocationProvider
+    /// Class reference, so it survives the view struct being copied. Both
+    /// construction sites use PopoverView as the root of a hosting
+    /// controller, which keeps the struct — and this default instance —
+    /// alive for the popover's lifetime.
+    @ObservedObject var model: PopoverModel = PopoverModel()
 
     enum Tab: Hashable { case light, automation }
 
@@ -49,9 +56,9 @@ struct PopoverView: View {
             header
 
             if helper.isInstalled {
-                SegmentedPicker(selection: $tab, options: Self.tabOptions)
+                SegmentedPicker(selection: $model.tab, options: Self.tabOptions)
 
-                switch tab {
+                switch model.tab {
                 case .light:
                     controls
                     Divider()
@@ -78,7 +85,6 @@ struct PopoverView: View {
         }
         .padding(12)
         .frame(width: 300)
-        .onAppear { tab = initialTab }
     }
 
     // MARK: - Sections
@@ -202,7 +208,7 @@ struct PopoverView: View {
             // macOS 26.4+: press Apple's own "Charge to Full Now" for the user.
             VStack(alignment: .leading, spacing: 3) {
                 Button("Charge to Full Now") { triggerSystemChargeToFull() }
-                Text(systemChargeStatus ?? "Fills to 100% this once, then your limit returns on its own.")
+                Text(model.systemChargeStatus ?? "Fills to 100% this once, then your limit returns on its own.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -211,17 +217,17 @@ struct PopoverView: View {
     }
 
     private func triggerSystemChargeToFull() {
-        systemChargeStatus = "Asking macOS…"
+        model.systemChargeStatus = "Asking macOS…"
         SystemChargeToFull.trigger { outcome in
             switch outcome {
             case .success:
-                systemChargeStatus = "Told macOS to charge to 100%. It returns to your limit automatically."
+                model.systemChargeStatus = "Told macOS to charge to 100%. It returns to your limit automatically."
             case .needsAccessibilityPermission:
-                systemChargeStatus = "Turn on MagHue in System Settings → Privacy & Security → Accessibility, then try again."
+                model.systemChargeStatus = "Turn on MagHue in System Settings → Privacy & Security → Accessibility, then try again."
             case .controlCenterUnavailable:
-                systemChargeStatus = "Couldn't reach the system battery menu. Try again in a moment."
+                model.systemChargeStatus = "Couldn't reach the system battery menu. Try again in a moment."
             case .buttonNotFound:
-                systemChargeStatus = "No “Charge to Full Now” right now — this appears only while your Mac is holding at a charge limit on power."
+                model.systemChargeStatus = "No “Charge to Full Now” right now — this appears only while your Mac is holding at a charge limit on power."
             }
         }
     }

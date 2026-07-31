@@ -54,7 +54,7 @@ enum ScreenshotMode {
             ]
 
             capture(PopoverView(settings: settings, helper: helper, monitor: monitor,
-                                location: location, initialTab: .automation),
+                                location: location, model: PopoverModel(tab: .automation)),
                     to: directory.appendingPathComponent("popover-automation.png")) {
                 NSApp.terminate(nil)
             }
