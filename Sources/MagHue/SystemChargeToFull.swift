@@ -32,9 +32,36 @@ enum SystemChargeToFull {
         _ = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
     }
 
-    /// Candidate labels for the menu item. English first; add localizations here.
-    private static let chargeLabels = ["charge to full now", "charge to full"]
-    private static let batteryHints = ["battery"]
+    /// Apple's own localization table for the Control Center battery menu.
+    /// Reading the labels from here means the lookup matches the button in
+    /// whatever language macOS is running — the strings are, by definition,
+    /// exactly the ones on screen. The English literals below are only the
+    /// fallback for the day Apple moves or renames the file.
+    private static let appleBatteryLoctable =
+        "/System/Library/CoreServices/ControlCenter.app/Contents/Resources/Battery.loctable"
+
+    /// Every localization of `key` in Apple's table (lowercased), plus the
+    /// fallbacks. All 41 languages go into the needle list rather than just
+    /// the current one, so nothing depends on guessing which locale Control
+    /// Center is actually drawing in.
+    private static func appleLocalizations(of key: String, fallback: [String]) -> [String] {
+        guard let data = FileManager.default.contents(atPath: appleBatteryLoctable),
+              let table = try? PropertyListSerialization.propertyList(from: data, format: nil)
+                as? [String: [String: Any]]
+        else { return fallback }
+        var needles = Set(fallback)
+        for locale in table.values {
+            if let value = locale[key] as? String {
+                needles.insert(value.lowercased())
+            }
+        }
+        return Array(needles)
+    }
+
+    private static let chargeLabels = appleLocalizations(
+        of: "Charge to Full Now", fallback: ["charge to full now", "charge to full"])
+    private static let batteryHints = appleLocalizations(
+        of: "Battery", fallback: ["battery"])
 
     static func trigger(completion: @escaping (Outcome) -> Void) {
         guard AXIsProcessTrusted() else {
