@@ -42,18 +42,11 @@ charge limit and your Mac never *reaches* 100%.
 
 ## Install
 
-Building needs the Xcode Command Line Tools. If you've never installed them:
-
 ```sh
-xcode-select --install
-```
-
-Then:
-
-```sh
+xcode-select --install    # only if you've never installed the CLT
 git clone https://github.com/kamenlevi/MagHue.git
 cd MagHue
-make install        # builds and copies MagHue.app to /Applications
+make install              # builds and copies MagHue.app to /Applications
 open /Applications/MagHue.app
 ```
 
