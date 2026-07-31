@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # One job per runner image, each with its own macOS SDK and Swift
+    # toolchain. A generic that only infers on one of them, or an API that
+    # moved, fails here instead of on someone else's Mac.
+    name: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-14, macos-15, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Build the app bundle
+        run: make app
+
+      - name: Check what came out
+        run: |
+          test -x dist/MagHue.app/Contents/MacOS/MagHue
+          test -x dist/MagHue.app/Contents/Resources/maghue-helper
+          test -f dist/MagHue.app/Contents/Resources/AppIcon.icns
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+            dist/MagHue.app/Contents/Info.plist
+          codesign --verify --verbose dist/MagHue.app
