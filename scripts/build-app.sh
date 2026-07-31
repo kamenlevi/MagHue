@@ -6,6 +6,8 @@ set -euo pipefail
 # no output is the one bug report nobody can act on.
 trap 'echo "" >&2
       echo "build-app.sh failed at line $LINENO: $BASH_COMMAND" >&2
+      echo "  macOS $(sw_vers -productVersion) ($(sw_vers -buildVersion)) · $(uname -m)" >&2
+      echo "  $(swift --version 2>&1 | head -1)" >&2
       echo "Please open an issue with the output above:" >&2
       echo "  https://github.com/kamenlevi/MagHue/issues" >&2' ERR
 
