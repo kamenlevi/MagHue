@@ -19,6 +19,21 @@ struct PopoverView: View {
 
     enum Tab: Hashable { case light, automation }
 
+    // Spelled out rather than inferred from the binding: Swift 6.4 resolves
+    // the picker's generic to `any Hashable` when these are written inline,
+    // and then `.light` and `.automation` don't exist on it. Fails the build
+    // on the macOS 27 SDK; harmless everywhere else.
+    private static let tabOptions: [SegmentedPicker<Tab>.Option] = [
+        SegmentedPicker<Tab>.Option(.light, "Light"),
+        SegmentedPicker<Tab>.Option(.automation, "Automation"),
+    ]
+
+    private static let modeOptions: [SegmentedPicker<LEDMode>.Option] = [
+        SegmentedPicker<LEDMode>.Option(.auto, "Custom"),
+        SegmentedPicker<LEDMode>.Option(.off, "Off"),
+        SegmentedPicker<LEDMode>.Option(.system, "System"),
+    ]
+
     init(settings: Settings, helper: HelperManager, monitor: BatteryMonitor,
          location: LocationProvider, initialTab: Tab = .light) {
         self.settings = settings
@@ -33,9 +48,7 @@ struct PopoverView: View {
             header
 
             if helper.isInstalled {
-                SegmentedPicker(selection: $tab,
-                                options: [.init(.light, "Light"),
-                                          .init(.automation, "Automation")])
+                SegmentedPicker(selection: $tab, options: Self.tabOptions)
 
                 switch tab {
                 case .light:
@@ -131,10 +144,7 @@ struct PopoverView: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SegmentedPicker(selection: $settings.mode,
-                            options: [.init(LEDMode.auto, "Custom"),
-                                      .init(LEDMode.off, "Off"),
-                                      .init(LEDMode.system, "System")])
+            SegmentedPicker(selection: $settings.mode, options: Self.modeOptions)
 
             Text(modeExplanation)
                 .font(.caption)
