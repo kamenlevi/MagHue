@@ -2,11 +2,31 @@
 # Builds MagHue.app into dist/. Usage: scripts/build-app.sh [version]
 set -euo pipefail
 
+# Say which step failed rather than exiting silently — "the build failed" with
+# no output is the one bug report nobody can act on.
+trap 'echo "" >&2
+      echo "build-app.sh failed at line $LINENO: $BASH_COMMAND" >&2
+      echo "Please open an issue with the output above:" >&2
+      echo "  https://github.com/kamenlevi/MagHue/issues" >&2' ERR
+
 cd "$(dirname "$0")/.."
 VERSION="${1:-1.0.0}"
 BUILD_NUMBER="$(date +%Y%m%d%H%M)"
 DIST="dist"
 APP="$DIST/MagHue.app"
+
+# Preflight: the usual reason a first build fails is no Swift toolchain at all.
+if ! xcode-select -p >/dev/null 2>&1; then
+    echo "Xcode Command Line Tools are missing. Install them with:" >&2
+    echo "  xcode-select --install" >&2
+    exit 1
+fi
+if ! command -v swift >/dev/null 2>&1; then
+    echo "No 'swift' in PATH. Install the Xcode Command Line Tools:" >&2
+    echo "  xcode-select --install" >&2
+    exit 1
+fi
+echo "macOS $(sw_vers -productVersion) · $(swift --version 2>&1 | head -1)"
 
 ARCH_FLAGS="--arch arm64"
 swift build -c release $ARCH_FLAGS
@@ -39,5 +59,11 @@ rm -rf "$ICON_TMP"
 
 codesign --force --sign - "$APP/Contents/Resources/maghue-helper"
 codesign --force --sign - --deep "$APP"
+
+# Prove the bundle is actually there before claiming success.
+if [ ! -x "$APP/Contents/MacOS/MagHue" ]; then
+    echo "build finished but $APP/Contents/MacOS/MagHue is missing" >&2
+    exit 1
+fi
 
 echo "built $APP (version $VERSION)"

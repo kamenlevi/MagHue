@@ -42,6 +42,14 @@ charge limit and your Mac never *reaches* 100%.
 
 ## Install
 
+Building needs the Xcode Command Line Tools. If you've never installed them:
+
+```sh
+xcode-select --install
+```
+
+Then:
+
 ```sh
 git clone https://github.com/kamenlevi/MagHue.git
 cd MagHue
@@ -51,6 +59,11 @@ open /Applications/MagHue.app
 
 Click the MagSafe icon in the menu bar, then **Install Helper…** — you'll be
 asked for your admin password once. That's it.
+
+If the build fails, the script prints which step broke and the Swift version it
+used. Please [open an issue](https://github.com/kamenlevi/MagHue/issues) with
+that output — it's usually a toolchain difference rather than anything about
+your Mac.
 
 ## How it works
 
