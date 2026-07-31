@@ -13,27 +13,6 @@ charge limit and your Mac never *reaches* 100%.
   <img src="docs/popover-automation.png?v=2" alt="MagHue's Automation tab: light off from sunset to sunrise" width="356">
 </p>
 
-## Features
-
-- **Threshold slider** — pick the battery percentage (10–100%) at which the LED
-  turns green while on power; below it the LED shows the usual amber.
-- **Three LED modes** — *Custom* (green at your chosen level, amber below it),
-  *Off* (dark while plugged in), or *System* (stock macOS behavior). Each has a
-  one-line explanation in the app.
-- **Charge to Full once** — a one-shot button that lifts the macOS charge limit
-  so the battery fills to 100% this time (handy before travel), then restores
-  your limit automatically once it's full. Shown only on Macs whose firmware
-  exposes the charge-limit keys.
-- **Automation** — an Automation tab where you schedule the light to change at
-  set times: pick the days, a start and end (a clock time, or **sunset** /
-  **sunrise**), and what the light does in that window (Off, Green, Amber,
-  System, or Custom). For example, keep the light off from sunset to sunrise
-  every day. Sunrise/sunset are computed locally from your location — no network.
-- Optional extras: a notification when the threshold is reached (off by
-  default). Launch at login is on by default and can be turned off.
-- Works even when the app is closed — a tiny background helper keeps the LED
-  correct at all times.
-
 ## Requirements
 
 - Apple Silicon MacBook with a MagSafe 3 port (2021 or later MacBook Pro / Air).
@@ -57,6 +36,27 @@ If the build fails, the script prints which step broke and the Swift version it
 used. Please [open an issue](https://github.com/kamenlevi/MagHue/issues) with
 that output — it's usually a toolchain difference rather than anything about
 your Mac.
+
+## Features
+
+- **Threshold slider** — pick the battery percentage (10–100%) at which the LED
+  turns green while on power; below it the LED shows the usual amber.
+- **Three LED modes** — *Custom* (green at your chosen level, amber below it),
+  *Off* (dark while plugged in), or *System* (stock macOS behavior). Each has a
+  one-line explanation in the app.
+- **Charge to Full once** — a one-shot button that lifts the macOS charge limit
+  so the battery fills to 100% this time (handy before travel), then restores
+  your limit automatically once it's full. Shown only on Macs whose firmware
+  exposes the charge-limit keys.
+- **Automation** — an Automation tab where you schedule the light to change at
+  set times: pick the days, a start and end (a clock time, or **sunset** /
+  **sunrise**), and what the light does in that window (Off, Green, Amber,
+  System, or Custom). For example, keep the light off from sunset to sunrise
+  every day. Sunrise/sunset are computed locally from your location — no network.
+- Optional extras: a notification when the threshold is reached (off by
+  default). Launch at login is on by default and can be turned off.
+- Works even when the app is closed — a tiny background helper keeps the LED
+  correct at all times.
 
 ## How it works
 
