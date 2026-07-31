@@ -131,7 +131,7 @@ sudo rm -rf "/Library/Application Support/MagHue" /Library/Logs/MagHue
 
 [Peter Levi](https://github.com/peterlevi) — author of Variety — took part in
 developing MagHue. The **Donate** button in the app goes to his PayPal for that
-reason; it's the same account Variety collects donations through.
+reason; 
 
 ## License
 
