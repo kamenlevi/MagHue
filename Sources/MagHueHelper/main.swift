@@ -281,11 +281,25 @@ final class Daemon {
         // connection starts under system control.
         let force = onAC && !wasOnAC
         wasOnAC = onAC
-        guard desired != lastWritten || force else { return }
+
+        // Another app can rewrite the LED after us — AlDente Pro's MagSafe
+        // LED feature shares this key — and writing only on change would lose
+        // that fight permanently. Reads are unprivileged and cheap, so spot
+        // external writes and win the key back on the next pass. `current()`
+        // is nil for a byte outside `Color`, which also counts as drift; a
+        // failed read skips the check.
+        var drifted = false
+        if let actual = try? MagSafeLED.current() {
+            drifted = actual != desired
+        }
+        guard desired != lastWritten || force || drifted else { return }
 
         do {
             try MagSafeLED.set(desired)
             lastWritten = desired
+            if drifted {
+                log.notice("LED key was changed externally; reasserting")
+            }
             log.info("LED -> \(String(describing: desired), privacy: .public) (battery \(battery?.percent ?? -1)%)")
         } catch {
             log.error("SMC write failed: \(String(describing: error), privacy: .public)")

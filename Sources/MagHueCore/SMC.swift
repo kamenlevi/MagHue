@@ -207,6 +207,13 @@ public enum MagSafeLED {
         try SMC.writeByte(key, color.rawValue)
     }
 
+    /// The color the firmware currently reports. Throws when the key can't
+    /// be read; nil when the byte isn't a recognised `Color`, which callers
+    /// should treat as someone else's write.
+    public static func current() throws -> Color? {
+        Color(rawValue: try SMC.readByte(key))
+    }
+
     /// True if this Mac exposes the MagSafe LED key at all.
     public static func isSupported() -> Bool {
         (try? SMC.keyInfo(key)) != nil
