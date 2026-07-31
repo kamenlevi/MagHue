@@ -16,7 +16,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-14, macos-15, macos-latest]
+        # xcode-27 is GitHub's preview image with the Xcode 27 beta — the
+        # Swift 6.4 / macOS 27 SDK toolchain that issue #1 was reported on.
+        runner: [macos-14, macos-15, macos-latest, xcode-27]
 
     steps:
       - uses: actions/checkout@v4
