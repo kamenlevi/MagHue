@@ -1,4 +1,9 @@
-import AppKit
+// Deliberately no `import AppKit` here. On the macOS 27 SDK it shadows
+// SwiftUI's State, which stops @State being a property wrapper at all: `$tab`
+// vanishes and assigning to a @State property reads as mutating the view.
+// SwiftUI re-exports what this file needs from AppKit anyway (NSWorkspace,
+// NSApp, NSColor), and the wrappers below are qualified so no future import
+// can shadow them either.
 import MagHueCore
 import SwiftUI
 
@@ -10,12 +15,12 @@ struct PopoverView: View {
         "https://www.paypal.com/donate/?business=DHQUELMQRQW46&no_recurring=0"
         + "&item_name=MagHue&currency_code=EUR")!
 
-    @ObservedObject var settings: Settings
-    @ObservedObject var helper: HelperManager
-    @ObservedObject var monitor: BatteryMonitor
-    @ObservedObject var location: LocationProvider
-    @State private var systemChargeStatus: String?
-    @State private var tab: Tab
+    @SwiftUI.ObservedObject var settings: Settings
+    @SwiftUI.ObservedObject var helper: HelperManager
+    @SwiftUI.ObservedObject var monitor: BatteryMonitor
+    @SwiftUI.ObservedObject var location: LocationProvider
+    @SwiftUI.State private var systemChargeStatus: String?
+    @SwiftUI.State private var tab: Tab
 
     enum Tab: Hashable { case light, automation }
 
@@ -40,7 +45,7 @@ struct PopoverView: View {
         self.helper = helper
         self.monitor = monitor
         self.location = location
-        _tab = State(initialValue: initialTab)
+        _tab = SwiftUI.State(initialValue: initialTab)
     }
 
     var body: some View {
