@@ -19,34 +19,30 @@ struct PopoverView: View {
     @SwiftUI.ObservedObject var helper: HelperManager
     @SwiftUI.ObservedObject var monitor: BatteryMonitor
     @SwiftUI.ObservedObject var location: LocationProvider
-    @SwiftUI.State private var systemChargeStatus: String?
-    @SwiftUI.State private var tab: Tab
+    /// Which tab to open on. Applied in `onAppear` rather than through a
+    /// custom init assigning `_tab`: that init was the only unusual thing
+    /// about this view's storage, and the macOS 27 build reports @State here
+    /// as not being a property wrapper at all.
+    var initialTab: Tab = .light
+
+    @SwiftUI.State private var systemChargeStatus: String? = nil
+    @SwiftUI.State private var tab: Tab = .light
 
     enum Tab: Hashable { case light, automation }
 
     // Spelled out rather than inferred from the binding: Swift 6.4 resolves
     // the picker's generic to `any Hashable` when these are written inline,
-    // and then `.light` and `.automation` don't exist on it. Fails the build
-    // on the macOS 27 SDK; harmless everywhere else.
-    private static let tabOptions: [SegmentedPicker<Tab>.Option] = [
-        SegmentedPicker<Tab>.Option(.light, "Light"),
-        SegmentedPicker<Tab>.Option(.automation, "Automation"),
+    // and then `.light` and `.automation` don't exist on it.
+    private static let tabOptions: [SegmentOption<Tab>] = [
+        SegmentOption(Tab.light, "Light"),
+        SegmentOption(Tab.automation, "Automation"),
     ]
 
-    private static let modeOptions: [SegmentedPicker<LEDMode>.Option] = [
-        SegmentedPicker<LEDMode>.Option(.auto, "Custom"),
-        SegmentedPicker<LEDMode>.Option(.off, "Off"),
-        SegmentedPicker<LEDMode>.Option(.system, "System"),
+    private static let modeOptions: [SegmentOption<LEDMode>] = [
+        SegmentOption(LEDMode.auto, "Custom"),
+        SegmentOption(LEDMode.off, "Off"),
+        SegmentOption(LEDMode.system, "System"),
     ]
-
-    init(settings: Settings, helper: HelperManager, monitor: BatteryMonitor,
-         location: LocationProvider, initialTab: Tab = .light) {
-        self.settings = settings
-        self.helper = helper
-        self.monitor = monitor
-        self.location = location
-        _tab = SwiftUI.State(initialValue: initialTab)
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -82,6 +78,7 @@ struct PopoverView: View {
         }
         .padding(12)
         .frame(width: 300)
+        .onAppear { tab = initialTab }
     }
 
     // MARK: - Sections

@@ -24,20 +24,23 @@ struct FilledButtonStyle: ButtonStyle {
 /// unselected ones and tints the track slightly differently — so the LED mode
 /// picker never matched the tab picker above it. Drawing both makes them
 /// identical, and gives every segment the same width.
-struct SegmentedPicker<Value: Hashable>: View {
-    struct Option: Identifiable {
-        let value: Value
-        let title: String
-        var id: Value { value }
+/// One segment. Declared at file scope rather than nested inside the generic
+/// picker: `SegmentedPicker<Tab>.Option` referenced from another type's static
+/// property is exactly the shape that fell over on Swift 6.4.
+struct SegmentOption<Value: Hashable>: Identifiable {
+    let value: Value
+    let title: String
+    var id: Value { value }
 
-        init(_ value: Value, _ title: String) {
-            self.value = value
-            self.title = title
-        }
+    init(_ value: Value, _ title: String) {
+        self.value = value
+        self.title = title
     }
+}
 
-    @Binding var selection: Value
-    let options: [Option]
+struct SegmentedPicker<Value: Hashable>: View {
+    @SwiftUI.Binding var selection: Value
+    let options: [SegmentOption<Value>]
 
     var body: some View {
         HStack(spacing: 2) {
@@ -52,7 +55,7 @@ struct SegmentedPicker<Value: Hashable>: View {
         )
     }
 
-    private func segment(_ option: Option) -> some View {
+    private func segment(_ option: SegmentOption<Value>) -> some View {
         let isSelected = option.value == selection
         return Button {
             selection = option.value
