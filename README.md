@@ -33,8 +33,16 @@ Click the MagSafe icon in the menu bar, then **Install Helper…** — you'll be
 asked for your admin password once. That's it.
 
 If the build fails, the script prints which step broke and the Swift version it
-used. Please [open an issue](https://github.com/kamenlevi/MagHue/issues) with
-that output — it's usually a toolchain difference rather than anything about
+used. Capture it and send the last 40 lines — that's the useful part, no need
+for the whole log:
+
+```sh
+make install > /tmp/maghue-build.log 2>&1
+tail -40 /tmp/maghue-build.log
+```
+
+[Open an issue](https://github.com/kamenlevi/MagHue/issues/new/choose) with
+that output. It's usually a toolchain difference rather than anything about
 your Mac.
 
 ## Features
