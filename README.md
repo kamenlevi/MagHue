@@ -31,7 +31,7 @@ It downloads the latest release, puts MagHue.app into /Applications and opens
 it. Nothing to build, no Xcode tools needed, and no macOS security dialog:
 command-line downloads skip the quarantine that browser downloads get.
 
-Then click the MagSafe icon in the menu bar, press **Install Helper…** and
+Then click the MagHue icon in the menu bar, press **Install Helper…** and
 enter your admin password once. That's it.
 
 ### Or download it yourself
