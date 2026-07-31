@@ -28,8 +28,8 @@ curl -fsSL https://raw.githubusercontent.com/kamenlevi/MagHue/main/scripts/insta
 ```
 
 It downloads the latest release, puts MagHue.app into /Applications and opens
-it — nothing to build, no Xcode tools needed, and no macOS security dialog
-(command-line downloads skip the quarantine that browser downloads get).
+it. Nothing to build, no Xcode tools needed, and no macOS security dialog:
+command-line downloads skip the quarantine that browser downloads get.
 
 Then click the MagSafe icon in the menu bar, press **Install Helper…** and
 enter your admin password once. That's it.
@@ -39,7 +39,7 @@ enter your admin password once. That's it.
 Grab `MagHue.zip` from the [latest release](https://github.com/kamenlevi/MagHue/releases/latest),
 unzip it and drag MagHue.app into Applications. Because browsers quarantine
 downloads and MagHue isn't notarized (that costs $99/year), the first launch
-shows "Apple could not verify…" — click **Done**, open **System Settings →
+shows "Apple could not verify…". Click **Done**, open **System Settings →
 Privacy & Security**, scroll down and press **Open Anyway**. It's a one-time
 step.
 
