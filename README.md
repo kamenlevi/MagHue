@@ -3,7 +3,7 @@
 Choose when your MagSafe charger's LED turns green.
 
 Out of the box, macOS keeps the MagSafe LED amber until the battery hits 100%.
-MagHue is a tiny menu bar app that lets you pick the percentage instead — set it
+MagHue is a tiny menu bar app that lets you pick the percentage instead. Set it
 to 80% and the LED turns green the moment your battery reaches 80% while
 charging, and back to amber if it ever drops below. Perfect if you use a
 charge limit and your Mac never *reaches* 100%.
@@ -29,11 +29,11 @@ make install              # builds and copies MagHue.app to /Applications
 open /Applications/MagHue.app
 ```
 
-Click the MagSafe icon in the menu bar, then **Install Helper…** — you'll be
+Click the MagSafe icon in the menu bar, then **Install Helper…** and you'll be
 asked for your admin password once. That's it.
 
 If the build fails, the script prints which step broke and the Swift version it
-used. Capture it and send the last 40 lines — that's the useful part, no need
+used. Capture it and send the last 40 lines, which is the useful part. No need
 for the whole log:
 
 ```sh
@@ -47,23 +47,24 @@ your Mac.
 
 ## Features
 
-- **Threshold slider** — pick the battery percentage (10–100%) at which the LED
+- **Threshold slider**: pick the battery percentage (10-100%) at which the LED
   turns green while on power; below it the LED shows the usual amber.
-- **Three LED modes** — *Custom* (green at your chosen level, amber below it),
+- **Three LED modes**: *Custom* (green at your chosen level, amber below it),
   *Off* (dark while plugged in), or *System* (stock macOS behavior). Each has a
   one-line explanation in the app.
-- **Charge to Full once** — a one-shot button that lifts the macOS charge limit
+- **Charge to Full once**: a one-shot button that lifts the macOS charge limit
   so the battery fills to 100% this time (handy before travel), then restores
   your limit automatically once it's full. Shown only on Macs whose firmware
   exposes the charge-limit keys.
-- **Automation** — an Automation tab where you schedule the light to change at
+- **Automation**: an Automation tab where you schedule the light to change at
   set times: pick the days, a start and end (a clock time, or **sunset** /
   **sunrise**), and what the light does in that window (Off, Green, Amber,
   System, or Custom). For example, keep the light off from sunset to sunrise
-  every day. Sunrise/sunset are computed locally from your location — no network.
+  every day. Sunrise/sunset are computed locally from your location, with
+  no network access.
 - Optional extras: a notification when the threshold is reached (off by
   default). Launch at login is on by default and can be turned off.
-- Works even when the app is closed — a tiny background helper keeps the LED
+- Works even when the app is closed: a tiny background helper keeps the LED
   correct at all times.
 
 ## How it works
@@ -76,14 +77,14 @@ and writes that one key. The menu bar app is just the UI; the daemon does the
 work, which is why the LED stays correct even when the app isn't running.
 
 **Charge to Full** works through the firmware charge-limit keys (`bfF0`/`bfD0`/
-`bfE0`) — the same mechanism macOS's own Charge Limit uses. MagHue lifts the
+`bfE0`), the same mechanism macOS's own Charge Limit uses. MagHue lifts the
 limit, waits for 100%, then restores your exact previous setting. If your Mac's
 firmware doesn't expose the full key set, the button simply doesn't appear and
 MagHue never touches charging at all.
 
 ### Is this safe?
 
-Yes. `ACLC` only changes what the LED *indicates* — it has no effect on
+Yes. `ACLC` only changes what the LED *indicates*. It has no effect on
 charging current, voltage, battery management, or anything else. It's the same
 mechanism macOS itself uses to drive the LED, and value `0` hands control
 straight back to the system. Open-source tools like
@@ -129,13 +130,13 @@ sudo rm -rf "/Library/Application Support/MagHue" /Library/Logs/MagHue
 
 ## Credits
 
-[Peter Levi](https://github.com/peterlevi) — author of Variety — took part in
+[Peter Levi](https://github.com/peterlevi), author of Variety, took part in
 developing MagHue. The **Donate** button in the app goes to his PayPal for that
-reason; 
+reason.
 
 ## License
 
-MagHue — choose when your MagSafe charger's LED turns green.
+MagHue: choose when your MagSafe charger's LED turns green.
 Copyright © 2026 Kamen Levi.
 
 This program is free software: you can redistribute it and/or modify it under
@@ -143,6 +144,6 @@ the terms of the GNU General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version. See [LICENSE](LICENSE).
 
-In short: fork it, change it, ship it — but anything you distribute that's
+In short: fork it, change it, ship it, but anything you distribute that's
 built on it has to stay under the GPL, with its source available. It can't be
 folded into a closed-source app.
