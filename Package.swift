@@ -6,6 +6,10 @@ let package = Package(
     platforms: [
         .macOS("14.0")
     ],
+    products: [
+        // Exposed so behaviour checks can link against the shared logic.
+        .library(name: "MagHueCore", targets: ["MagHueCore"]),
+    ],
     targets: [
         // Code shared by the app and the privileged helper.
         .target(

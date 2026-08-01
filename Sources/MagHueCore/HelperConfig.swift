@@ -43,25 +43,52 @@ public enum ScheduleAction: String, Codable, CaseIterable {
 /// A point in the day a schedule starts or ends: a fixed clock time, or a
 /// solar event resolved from the user's location.
 public struct TimeAnchor: Codable, Equatable {
-    public enum Kind: String, Codable { case clock, sunset, sunrise }
+    /// What a rule's start or end is pinned to. `percent` makes the rule
+    /// depend on the battery rather than the clock, so "off once it reaches
+    /// 80%" is a rule like any other.
+    public enum Kind: String, Codable { case clock, sunset, sunrise, percent }
     public var kind: Kind
     public var hour: Int
     public var minute: Int
+    /// Battery percentage, used only when `kind` is `.percent`.
+    public var percent: Int
 
-    public init(kind: Kind = .clock, hour: Int = 22, minute: Int = 0) {
+    public init(kind: Kind = .clock, hour: Int = 22, minute: Int = 0,
+                percent: Int = 80) {
         self.kind = kind
         self.hour = hour
         self.minute = minute
+        self.percent = min(max(percent, 0), 100)
     }
 
     public static let sunset = TimeAnchor(kind: .sunset, hour: 0, minute: 0)
     public static let sunrise = TimeAnchor(kind: .sunrise, hour: 0, minute: 0)
+    public static func battery(_ percent: Int) -> TimeAnchor {
+        TimeAnchor(kind: .percent, hour: 0, minute: 0, percent: percent)
+    }
 
-    /// Minutes from local midnight for this anchor on `date`, or nil if a
-    /// solar anchor can't be resolved (no location / polar day or night).
+    /// True when this anchor is about the clock rather than the battery.
+    public var isTimeBased: Bool { kind != .percent }
+
+    // Config files written before battery anchors existed have no `percent`.
+    enum CodingKeys: String, CodingKey { case kind, hour, minute, percent }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(kind: try c.decodeIfPresent(Kind.self, forKey: .kind) ?? .clock,
+                  hour: try c.decodeIfPresent(Int.self, forKey: .hour) ?? 22,
+                  minute: try c.decodeIfPresent(Int.self, forKey: .minute) ?? 0,
+                  percent: try c.decodeIfPresent(Int.self, forKey: .percent) ?? 80)
+    }
+
+    /// Minutes from local midnight for this anchor on `date`, or nil if it
+    /// isn't a clock anchor at all, or a solar one can't be resolved (no
+    /// location / polar day or night).
     public func minutesFromMidnight(on date: Date, calendar: Calendar,
                                     latitude: Double?, longitude: Double?) -> Int? {
         switch kind {
+        case .percent:
+            return nil
         case .clock:
             return hour * 60 + minute
         case .sunrise, .sunset:
@@ -195,8 +222,21 @@ public struct HelperConfig: Codable, Equatable {
         }
     }
 
-    /// The first enabled schedule active at `date`, if any.
-    public func activeSchedule(at date: Date, calendar: Calendar = .current) -> Schedule? {
+    /// The first enabled schedule active right now, if any.
+    ///
+    /// A rule's two anchors can each be a clock time (including sunset and
+    /// sunrise) or a battery percentage, and they combine like this:
+    ///
+    /// - Two clock anchors: the usual time window, wrapping past midnight.
+    /// - Two battery anchors: active while the battery sits between them,
+    ///   whichever order they were entered in.
+    /// - One of each: each anchor becomes a single bound and both must hold,
+    ///   so "from 80% to 22:00" means at or above 80% and before 22:00.
+    ///
+    /// The weekday set applies either way.
+    public func activeSchedule(at date: Date = Date(),
+                               calendar: Calendar = .current,
+                               battery: BatteryState? = nil) -> Schedule? {
         let nowMinutes = { () -> Int in
             let c = calendar.dateComponents([.hour, .minute], from: date)
             return (c.hour ?? 0) * 60 + (c.minute ?? 0)
@@ -205,22 +245,63 @@ public struct HelperConfig: Codable, Equatable {
         let yesterday = calendar.component(
             .weekday, from: calendar.date(byAdding: .day, value: -1, to: date) ?? date)
 
-        for schedule in schedules where schedule.enabled && !schedule.days.isEmpty {
-            guard let start = schedule.start.minutesFromMidnight(
-                    on: date, calendar: calendar, latitude: latitude, longitude: longitude),
-                  let end = schedule.end.minutesFromMidnight(
-                    on: date, calendar: calendar, latitude: latitude, longitude: longitude),
-                  start != end
-            else { continue }
+        func minutes(_ anchor: TimeAnchor) -> Int? {
+            anchor.minutesFromMidnight(on: date, calendar: calendar,
+                                       latitude: latitude, longitude: longitude)
+        }
 
-            if start < end {
-                if schedule.days.contains(today), nowMinutes >= start, nowMinutes < end {
-                    return schedule
+        for schedule in schedules where schedule.enabled && !schedule.days.isEmpty {
+            guard schedule.days.contains(today) || schedule.days.contains(yesterday) else {
+                continue
+            }
+            let startsOnTime = schedule.start.isTimeBased
+            let endsOnTime = schedule.end.isTimeBased
+
+            switch (startsOnTime, endsOnTime) {
+            case (true, true):
+                guard let start = minutes(schedule.start), let end = minutes(schedule.end),
+                      start != end else { continue }
+                if start < end {
+                    if schedule.days.contains(today), nowMinutes >= start, nowMinutes < end {
+                        return schedule
+                    }
+                } else {
+                    // Window wraps past midnight.
+                    if schedule.days.contains(today), nowMinutes >= start { return schedule }
+                    if schedule.days.contains(yesterday), nowMinutes < end { return schedule }
                 }
-            } else {
-                // Window wraps past midnight.
-                if schedule.days.contains(today), nowMinutes >= start { return schedule }
-                if schedule.days.contains(yesterday), nowMinutes < end { return schedule }
+
+            case (false, false):
+                // A battery range. Entering it backwards is a slip, not a
+                // wrap: a battery can't run past 100% into 0% the way a clock
+                // runs past midnight.
+                guard schedule.days.contains(today), let percent = battery?.percent else { continue }
+                let low = min(schedule.start.percent, schedule.end.percent)
+                let high = max(schedule.start.percent, schedule.end.percent)
+                if percent >= low, percent <= high { return schedule }
+
+            default:
+                // Mixed: each anchor is one bound and both have to hold.
+                guard schedule.days.contains(today) else { continue }
+                let startHolds: Bool
+                if startsOnTime {
+                    guard let start = minutes(schedule.start) else { continue }
+                    startHolds = nowMinutes >= start
+                } else {
+                    guard let percent = battery?.percent else { continue }
+                    startHolds = percent >= schedule.start.percent
+                }
+
+                let endHolds: Bool
+                if endsOnTime {
+                    guard let end = minutes(schedule.end) else { continue }
+                    endHolds = nowMinutes < end
+                } else {
+                    guard let percent = battery?.percent else { continue }
+                    endHolds = percent <= schedule.end.percent
+                }
+
+                if startHolds, endHolds { return schedule }
             }
         }
         return nil
@@ -230,7 +311,7 @@ public struct HelperConfig: Codable, Equatable {
     public func resolvedColor(for battery: BatteryState?,
                               at date: Date = Date(),
                               calendar: Calendar = .current) -> MagSafeLED.Color {
-        if let schedule = activeSchedule(at: date, calendar: calendar) {
+        if let schedule = activeSchedule(at: date, calendar: calendar, battery: battery) {
             return color(for: schedule.action, battery: battery)
         }
         return baseColor(for: battery)

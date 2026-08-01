@@ -40,9 +40,9 @@ struct ScheduleEditor: View {
             }
 
             HStack(spacing: 4) {
-                Text("From").font(.caption).foregroundStyle(.secondary)
+                Text("From").font(.caption).foregroundStyle(.secondary).fixedSize()
                 anchorControl($schedule.start)
-                Text("to").font(.caption).foregroundStyle(.secondary)
+                Text("to").font(.caption).foregroundStyle(.secondary).fixedSize()
                 anchorControl($schedule.end)
             }
 
@@ -59,7 +59,7 @@ struct ScheduleEditor: View {
         .opacity(schedule.enabled ? 1 : 0.8)
     }
 
-    // MARK: - Anchor (time / sunset / sunrise)
+    // MARK: - Anchor (time / sunset / sunrise / battery %)
 
     @ViewBuilder
     private func anchorControl(_ anchor: Binding<TimeAnchor>) -> some View {
@@ -68,15 +68,31 @@ struct ScheduleEditor: View {
                 Button("Sunset") { anchor.wrappedValue.kind = .sunset }
                 Button("Sunrise") { anchor.wrappedValue.kind = .sunrise }
                 Button("Set time…") { anchor.wrappedValue.kind = .clock }
+                Divider()
+                Button("Battery %") { anchor.wrappedValue.kind = .percent }
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
 
-            if anchor.wrappedValue.kind == .clock {
+            switch anchor.wrappedValue.kind {
+            case .clock:
                 DatePicker("", selection: timeBinding(anchor), displayedComponents: .hourAndMinute)
                     .labelsHidden()
                     .datePickerStyle(.field)
                     .fixedSize()
+            case .percent:
+                // A menu rather than a stepper: two steppers plus their
+                // labels overflow the 300pt popover and squeeze out the
+                // "From" and "to". Steps of 5, like the threshold slider.
+                Menu("\(anchor.wrappedValue.percent)%") {
+                    ForEach(Array(stride(from: 0, through: 100, by: 5)), id: \.self) { value in
+                        Button("\(value)%") { anchor.wrappedValue.percent = value }
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            case .sunset, .sunrise:
+                EmptyView()
             }
         }
     }
@@ -86,7 +102,15 @@ struct ScheduleEditor: View {
         case .sunset: return "Sunset"
         case .sunrise: return "Sunrise"
         case .clock: return "Time"
+        case .percent: return "Batt."
         }
+    }
+
+    private func percentBinding(_ anchor: Binding<TimeAnchor>) -> Binding<Int> {
+        Binding(
+            get: { anchor.wrappedValue.percent },
+            set: { anchor.wrappedValue.percent = min(max($0, 0), 100) }
+        )
     }
 
     /// Bridges the anchor's hour/minute to the Date a DatePicker wants.
