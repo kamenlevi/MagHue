@@ -7,6 +7,7 @@ LABEL="com.kamenlevi.maghue.helper"
 BIN="/Library/PrivilegedHelperTools/$LABEL"
 PLIST="/Library/LaunchDaemons/$LABEL.plist"
 CONFIG_DIR="/Library/Application Support/MagHue"
+STATE_DIR="/var/db/maghue"
 LOG_DIR="/Library/Logs/MagHue"
 
 # The daemon resets the LED on SIGTERM; the explicit --reset is a backstop.
@@ -14,5 +15,5 @@ launchctl bootout "system/$LABEL" 2>/dev/null || true
 [ -x "$BIN" ] && "$BIN" --reset || true
 
 rm -f "$BIN" "$PLIST"
-rm -rf "$CONFIG_DIR" "$LOG_DIR"
+rm -rf "$CONFIG_DIR" "$STATE_DIR" "$LOG_DIR"
 echo "MagHue helper removed"

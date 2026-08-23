@@ -182,12 +182,33 @@ final class Daemon {
     // MARK: - Charge to Full
 
     private func loadChargeToFullState() {
-        guard let data = FileManager.default.contents(atPath: MagHue.helperStatePath),
+        // Versions up to b102ed7 kept this file in the user-owned config
+        // directory, where any user process could swap it out (GH issue #2).
+        // Anything there is untrusted: remove it, never read it.
+        try? FileManager.default.removeItem(atPath: MagHue.legacyHelperStatePath)
+
+        let fm = FileManager.default
+        guard let data = fm.contents(atPath: MagHue.helperStatePath),
               let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return }
+        // The new directory is root-owned, but only trust the file if the
+        // file itself still is.
+        guard let attrs = try? fm.attributesOfItem(atPath: MagHue.helperStatePath),
+              (attrs[.ownerAccountID] as? NSNumber)?.intValue == 0 else {
+            log.error("helper state file not owned by root; discarding")
+            try? fm.removeItem(atPath: MagHue.helperStatePath)
+            return
+        }
+        let lower = state["lower"] as? Int ?? 0
+        let upper = state["upper"] as? Int ?? 100
+        guard (0...100).contains(lower), (0...100).contains(upper), lower <= upper else {
+            log.error("helper state has invalid limit bounds \(lower)-\(upper); discarding")
+            try? fm.removeItem(atPath: MagHue.helperStatePath)
+            return
+        }
         restoreLimitWhenDone = state["restoreLimit"] as? Bool ?? false
-        savedLower = state["lower"] as? Int ?? 0
-        savedUpper = state["upper"] as? Int ?? 100
+        savedLower = lower
+        savedUpper = upper
         chargeToFullActive = config.chargeToFull
         if !chargeToFullActive {
             // We died between restoring and clearing state; finish the job.
@@ -198,8 +219,13 @@ final class Daemon {
     private func saveChargeToFullState() {
         let payload: [String: Any] = ["restoreLimit": restoreLimitWhenDone,
                                       "lower": savedLower, "upper": savedUpper]
-        let data = try? JSONSerialization.data(withJSONObject: payload)
-        try? data?.write(to: URL(fileURLWithPath: MagHue.helperStatePath))
+        guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        try? FileManager.default.createDirectory(
+            atPath: MagHue.helperStateDirectory, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o755])
+        FileManager.default.createFile(
+            atPath: MagHue.helperStatePath, contents: data,
+            attributes: [.posixPermissions: 0o600])
     }
 
     private func evaluateChargeToFull(battery: BatteryState?) {

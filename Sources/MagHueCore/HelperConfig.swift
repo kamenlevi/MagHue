@@ -9,7 +9,13 @@ public enum MagHue {
     public static let configPath = "\(configDirectory)/config.json"
     /// Root-owned scratch state the helper keeps across restarts
     /// (currently: whether Charge to Full must restore the charge limit).
-    public static let helperStatePath = "\(configDirectory)/helper-state.json"
+    /// Lives outside the user-owned config directory: whoever owns a file's
+    /// parent can replace the file, and this one feeds root SMC writes.
+    public static let helperStateDirectory = "/var/db/maghue"
+    public static let helperStatePath = "\(helperStateDirectory)/helper-state.json"
+    /// Where the state file used to live, inside the user-owned config
+    /// directory. Untrusted; deleted on helper start, never read.
+    public static let legacyHelperStatePath = "\(configDirectory)/helper-state.json"
 }
 
 public enum LEDMode: String, Codable, CaseIterable {
