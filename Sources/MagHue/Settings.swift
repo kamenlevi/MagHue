@@ -18,6 +18,11 @@ final class Settings: ObservableObject {
     @Published var chargeToFull: Bool {
         didSet { if chargeToFull != oldValue { pushToHelper() } }
     }
+    /// Seconds the LED shows its real charging colour right after the cable
+    /// connects, before the chosen mode takes over. 0 disables it.
+    @Published var graceSeconds: Int {
+        didSet { defaults.set(graceSeconds, forKey: "graceSeconds"); pushToHelper() }
+    }
     @Published var notifyOnThreshold: Bool {
         didSet { defaults.set(notifyOnThreshold, forKey: "notifyOnThreshold") }
     }
@@ -44,6 +49,8 @@ final class Settings: ObservableObject {
         let stored = defaults.integer(forKey: "threshold")
         threshold = stored == 0 ? 80 : stored
         chargeToFull = config.chargeToFull
+        graceSeconds = defaults.object(forKey: "graceSeconds") == nil
+            ? config.graceSeconds : defaults.integer(forKey: "graceSeconds")
         schedules = config.schedules
         latitude = config.latitude
         longitude = config.longitude
@@ -60,7 +67,8 @@ final class Settings: ObservableObject {
 
     var helperConfig: HelperConfig {
         HelperConfig(mode: mode, threshold: threshold, chargeToFull: chargeToFull,
-                     schedules: schedules, latitude: latitude, longitude: longitude)
+                     schedules: schedules, latitude: latitude, longitude: longitude,
+                     graceSeconds: graceSeconds)
     }
 
     func pushToHelper() {

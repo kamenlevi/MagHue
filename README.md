@@ -83,6 +83,11 @@ your Mac.
   System, or Custom). For example, keep the light off from sunset to sunrise
   every day. Sunrise/sunset are computed locally from your location, with
   no network access.
+- **Charging colour on connect** (optional): with the light set to *Off*, or
+  dark on a schedule, you lose the one moment it's genuinely useful:
+  confirming the magnet seated. Pick 5 s to 1 min and the LED shows its real
+  colour (amber charging, green full) right after you plug in, then goes back
+  to whatever you chose. Off by default.
 - Optional extras: a notification when the threshold is reached (off by
   default). Launch at login is on by default and can be turned off.
 - Works even when the app is closed: a tiny background helper keeps the LED

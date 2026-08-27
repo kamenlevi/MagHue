@@ -67,7 +67,7 @@ struct PopoverView: View {
                     automation
                 }
 
-                if helper.needsUpdate {
+                if helper.needsUpdate && !ScreenshotMode.isActive {
                     updatePrompt
                 }
             } else {
@@ -239,6 +239,7 @@ struct PopoverView: View {
                 .onChange(of: settings.notifyOnThreshold) { _, enabled in
                     if enabled { monitor.requestNotificationPermission() }
                 }
+            graceWindowPicker
             if let error = settings.launchAtLoginError {
                 Text(error)
                     .font(.caption)
@@ -247,6 +248,28 @@ struct PopoverView: View {
         }
         .toggleStyle(.checkbox)
         .font(.callout)
+    }
+
+    /// Brief flash of the real charging colour on connect, so the light still
+    /// confirms the magnet seated even when the mode (or a schedule) keeps it
+    /// dark. Duration options are coarse on purpose; this is a glance, not a
+    /// setting to tune.
+    private var graceWindowPicker: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Picker("Show charging colour on connect", selection: $settings.graceSeconds) {
+                Text("Never").tag(0)
+                Text("5 seconds").tag(5)
+                Text("15 seconds").tag(15)
+                Text("30 seconds").tag(30)
+                Text("1 minute").tag(60)
+            }
+            if settings.graceSeconds > 0 {
+                Text("Amber while charging or green when full for \(settings.graceSeconds) seconds after you plug in, then your chosen light takes over.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: - Automation
