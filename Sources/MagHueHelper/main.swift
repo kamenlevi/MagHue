@@ -80,6 +80,8 @@ if CommandLine.arguments.contains("--probe") {
     let probeConfig = HelperConfig.load()
     print("schedules: \(probeConfig.schedules.count), location: " +
           (probeConfig.latitude != nil ? "set" : "none"))
+    print("grace window: " + (probeConfig.graceSeconds > 0
+                              ? "\(probeConfig.graceSeconds)s after connect" : "disabled"))
     if let active = probeConfig.activeSchedule(at: Date()) {
         print("active schedule now: \(active.action.displayName)")
     } else {
@@ -99,6 +101,9 @@ final class Daemon {
     private var config = HelperConfig.load()
     private var lastWritten: MagSafeLED.Color?
     private var wasOnAC = false
+    // Open while a freshly connected cable is still showing its real colour.
+    private var graceStart: Date?
+    private var graceTimer: Timer?
     private var configWatcher: DispatchSourceFileSystemObject?
 
     // Charge to Full: whether we lifted the macOS charge limit and therefore
@@ -295,18 +300,61 @@ final class Daemon {
         config = cleared
     }
 
+    // MARK: - Grace window
+
+    /// Starts the post-connect window. Writing the real colour rather than
+    /// handing back to the firmware keeps the drift check below coherent:
+    /// `system` would let the firmware set a byte we did not write, which
+    /// reads as an external change on every pass.
+    private func beginGraceWindow() {
+        guard config.graceSeconds > 0 else { return }
+        graceStart = Date()
+        graceTimer?.invalidate()
+        // The periodic pass runs every 30s, so without a dedicated timer the
+        // LED would stay lit until whenever that next came around.
+        let timer = Timer(timeInterval: Double(config.graceSeconds), repeats: false) { [weak self] _ in
+            self?.endGraceWindow()
+            self?.evaluate()
+        }
+        RunLoop.main.add(timer, forMode: .default)
+        graceTimer = timer
+        log.info("grace window open for \(self.config.graceSeconds)s")
+    }
+
+    private func endGraceWindow() {
+        graceStart = nil
+        graceTimer?.invalidate()
+        graceTimer = nil
+    }
+
     // MARK: - LED
 
     func evaluate() {
         let battery = Battery.read()
         evaluateChargeToFull(battery: battery)
-        let desired = config.resolvedColor(for: battery)
+        var desired = config.resolvedColor(for: battery)
         let onAC = battery?.onACPower ?? false
 
         // Re-assert on every re-plug even if the value is unchanged: a fresh
         // connection starts under system control.
         let force = onAC && !wasOnAC
+        if force {
+            beginGraceWindow()
+        } else if !onAC {
+            endGraceWindow()
+        }
         wasOnAC = onAC
+
+        // While the window is open, show the colour the firmware would have
+        // shown, so connecting the cable still confirms that it seated even
+        // when the resolved mode is `off`.
+        if let started = graceStart {
+            if Date().timeIntervalSince(started) < Double(config.graceSeconds) {
+                desired = (battery?.isCharged ?? false) ? .green : .amber
+            } else {
+                endGraceWindow()
+            }
+        }
 
         // Another app can rewrite the LED after us — AlDente Pro's MagSafe
         // LED feature shares this key — and writing only on change would lose

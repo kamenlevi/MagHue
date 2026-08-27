@@ -144,19 +144,25 @@ public struct HelperConfig: Codable, Equatable {
     /// Cached location for resolving sunrise/sunset anchors (set by the app).
     public var latitude: Double?
     public var longitude: Double?
+    /// Seconds to show the real charging colour after the cable is connected,
+    /// before the resolved mode takes over. 0 disables the grace window, which
+    /// keeps the previous behaviour for configs written before this key existed.
+    public var graceSeconds: Int
 
     public init(mode: LEDMode = .auto, threshold: Int = 80, chargeToFull: Bool = false,
-                schedules: [Schedule] = [], latitude: Double? = nil, longitude: Double? = nil) {
+                schedules: [Schedule] = [], latitude: Double? = nil, longitude: Double? = nil,
+                graceSeconds: Int = 0) {
         self.mode = mode
         self.threshold = min(max(threshold, 10), 100)
         self.chargeToFull = chargeToFull
         self.schedules = schedules
         self.latitude = latitude
         self.longitude = longitude
+        self.graceSeconds = min(max(graceSeconds, 0), 600)
     }
 
     enum CodingKeys: String, CodingKey {
-        case mode, threshold, chargeToFull, schedules, latitude, longitude
+        case mode, threshold, chargeToFull, schedules, latitude, longitude, graceSeconds
     }
 
     // Tolerate config files written by older versions that lack newer keys.
@@ -168,8 +174,10 @@ public struct HelperConfig: Codable, Equatable {
         let schedules = try container.decodeIfPresent([Schedule].self, forKey: .schedules) ?? []
         let latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
         let longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+        let graceSeconds = try container.decodeIfPresent(Int.self, forKey: .graceSeconds) ?? 0
         self.init(mode: mode, threshold: threshold, chargeToFull: chargeToFull,
-                  schedules: schedules, latitude: latitude, longitude: longitude)
+                  schedules: schedules, latitude: latitude, longitude: longitude,
+                  graceSeconds: graceSeconds)
     }
 
     public static func load() -> HelperConfig {
