@@ -1,5 +1,6 @@
 import Foundation
 import IOKit.ps
+import IOKit.pwr_mgt
 import MagHueCore
 import os
 
@@ -97,6 +98,13 @@ if CommandLine.arguments.contains("--probe") {
     exit(0)
 }
 
+// IOMessage.h builds these with the iokit_common_msg macro, which Swift does
+// not import. File scope because the C-function-pointer callback below cannot
+// capture locals.
+let canSystemSleep: UInt32 = 0xE000_0270
+let systemWillSleep: UInt32 = 0xE000_0280
+let systemHasPoweredOn: UInt32 = 0xE000_0300
+
 final class Daemon {
     private var config = HelperConfig.load()
     private var lastWritten: MagSafeLED.Color?
@@ -105,6 +113,11 @@ final class Daemon {
     private var graceStart: Date?
     private var graceTimer: Timer?
     private var configWatcher: DispatchSourceFileSystemObject?
+
+    // System sleep/wake notifications (IORegisterForSystemPower).
+    fileprivate var rootPowerDomain: io_connect_t = 0
+    private var powerNotifyPort: IONotificationPortRef?
+    private var powerNotifier: io_object_t = 0
 
     // Charge to Full: whether we lifted the macOS charge limit and therefore
     // owe a restore once the battery is full, plus the bounds to restore.
@@ -129,6 +142,7 @@ final class Daemon {
         }
 
         watchConfigDirectory()
+        watchSystemWake()
         installSignalHandlers()
 
         // Re-evaluate every 30s so time- and sun-based schedules flip promptly.
@@ -300,6 +314,51 @@ final class Daemon {
         config = cleared
     }
 
+    // MARK: - Sleep / wake
+
+    /// While the Mac sleeps this process doesn't run, but the cable keeps its
+    /// own life: any detach/re-attach hands the LED back to the firmware,
+    /// which lights it in the stock colours all night regardless of mode or
+    /// schedule. Reassert the moment the system wakes instead of leaving the
+    /// wrong colour up for the rest of the 30s pass.
+    private func watchSystemWake() {
+        let callback: IOServiceInterestCallback = { context, _, messageType, messageArgument in
+            let daemon = Unmanaged<Daemon>.fromOpaque(context!).takeUnretainedValue()
+            switch messageType {
+            case canSystemSleep, systemWillSleep:
+                // We have nothing to save; never delay sleep (an unanswered
+                // message stalls the whole system for its 30s timeout).
+                IOAllowPowerChange(daemon.rootPowerDomain, Int(bitPattern: messageArgument))
+            case systemHasPoweredOn:
+                daemon.reassertAfterWake()
+            default:
+                break
+            }
+        }
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        var port: IONotificationPortRef?
+        var notifier: io_object_t = 0
+        rootPowerDomain = IORegisterForSystemPower(context, &port, callback, &notifier)
+        guard rootPowerDomain != 0, let port else {
+            log.error("IORegisterForSystemPower failed; wake reassert disabled")
+            return
+        }
+        powerNotifyPort = port
+        powerNotifier = notifier
+        CFRunLoopAddSource(CFRunLoopGetMain(),
+                           IONotificationPortGetRunLoopSource(port).takeUnretainedValue(),
+                           .defaultMode)
+    }
+
+    private func reassertAfterWake() {
+        // Clearing lastWritten makes the next evaluate write unconditionally,
+        // without faking an AC transition (which would open the grace window
+        // on every wake).
+        lastWritten = nil
+        evaluate()
+        log.info("reasserted LED after wake")
+    }
+
     // MARK: - Grace window
 
     /// Starts the post-connect window. Writing the real colour rather than
@@ -362,8 +421,11 @@ final class Daemon {
         // external writes and win the key back on the next pass. `current()`
         // is nil for a byte outside `Color`, which also counts as drift; a
         // failed read skips the check.
+        // Only meaningful on AC. Unplugged there is no LED, the key just
+        // reports whatever it held last and writes don't take, so checking
+        // would fight a ghost forever (a reassert every pass, all day).
         var drifted = false
-        if let actual = try? MagSafeLED.current() {
+        if onAC, let actual = try? MagSafeLED.current() {
             drifted = actual != desired
         }
         guard desired != lastWritten || force || drifted else { return }
